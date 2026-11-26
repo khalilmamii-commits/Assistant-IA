@@ -12,6 +12,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo">✦</span> Assistant IA <span id="engine-badge" class="badge"></span></div>
     <div class="topbar-actions">
+      <button id="btn-history" class="icon-btn" title="Historique des résultats">🕘</button>
       <button id="btn-new" class="icon-btn" title="Nouvelle conversation">↺</button>
       <button id="btn-settings" class="icon-btn" title="Paramètres">⚙</button>
     </div>
@@ -28,30 +29,25 @@
       </select>
     </label>
 
-    <!-- Réglages LM Studio -->
     <div id="cfg-lmstudio">
       <label>Adresse du serveur
         <input id="set-lms-url" placeholder="http://localhost:1234/v1" autocomplete="off">
       </label>
-      <p class="hint">C'est l'adresse affichée dans LM Studio, onglet Developer. Laissez la valeur par défaut si vous ne l'avez pas changée.</p>
-
+      <p class="hint">C'est l'adresse affichée dans LM Studio. Laissez la valeur par défaut si vous ne l'avez pas changée.</p>
       <label>Modèle
         <select id="set-lms-model">
           <option value="">Automatique (modèle chargé dans LM Studio)</option>
         </select>
       </label>
-
       <button id="btn-test" class="ghost test-btn">Tester la connexion</button>
       <p id="test-result" class="test-result" hidden></p>
     </div>
 
-    <!-- Réglages Claude -->
     <div id="cfg-claude" hidden>
       <label>Clé API Anthropic
         <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
       </label>
       <p class="hint">Créez-la sur console.anthropic.com → API Keys. Elle reste enregistrée uniquement sur cet ordinateur.</p>
-
       <label>Modèle
         <input id="set-model" list="models" placeholder="claude-sonnet-5-5">
         <datalist id="models">
@@ -63,9 +59,19 @@
     </div>
 
     <label>Votre contexte (optionnel)
-      <textarea id="set-context" rows="4"></textarea>
+      <textarea id="set-context" rows="3"></textarea>
     </label>
-    <p class="hint">Ce texte est donné à l'IA à chaque demande pour adapter le vocabulaire.</p>
+    <p class="hint">Donné à l'IA à chaque demande pour adapter le vocabulaire.</p>
+
+    <label>Mes règles perso (une par ligne)
+      <textarea id="set-rules" rows="4" placeholder="Écrire « maître d'ouvrage » en entier&#10;Ne jamais tutoyer"></textarea>
+    </label>
+    <p class="hint">Appliquées à chaque demande.</p>
+
+    <label>Termes à ne jamais modifier (un par ligne)
+      <textarea id="set-protected" rows="4" placeholder="RN568&#10;Port-de-Bouc&#10;GNT 0/31.5"></textarea>
+    </label>
+    <p class="hint">Noms de lieux, références, codes… L'IA doit les recopier tels quels. Un avertissement s'affiche si l'un d'eux disparaît.</p>
 
     <div class="row">
       <button id="btn-save" class="primary">Enregistrer</button>
@@ -73,13 +79,50 @@
     </div>
   </section>
 
+  <!-- HISTORIQUE -->
+  <section id="history-panel" class="settings" hidden>
+    <h2>Historique des résultats</h2>
+    <p class="hint">Les 30 derniers résultats, enregistrés sur cet ordinateur. Cliquez sur un résultat pour le réutiliser.</p>
+    <div id="history-list" class="history-list"></div>
+    <div class="row">
+      <button id="btn-history-close" class="primary">Fermer</button>
+      <button id="btn-history-clear" class="ghost">Effacer l'historique</button>
+    </div>
+  </section>
+
   <!-- ZONE PRINCIPALE -->
   <main id="main" class="main">
 
     <div id="browser-banner" class="banner" hidden>
-      <strong>Mode test hors de Word.</strong> Collez un texte ci-dessous pour essayer.
+      <strong>Mode test hors de Word.</strong> Collez un texte dans « Texte ciblé » pour essayer.
       <button id="btn-manifest" class="primary manifest-btn" hidden>⬇ Télécharger le manifeste pour Word</button>
     </div>
+
+    <details id="options-box" class="options-box" open>
+      <summary><span class="section-title">Réglages du texte</span> <span id="options-summary" class="muted"></span></summary>
+
+      <div class="section-head">
+        <span class="section-title small">Ton</span>
+        <span class="muted">plusieurs choix</span>
+        <button id="btn-options-clear" class="link-btn" hidden>Tout effacer</button>
+      </div>
+      <div id="tons" class="chips"></div>
+
+      <div class="section-head"><span class="section-title small">Forme</span></div>
+      <div id="opt-forme" class="chips"></div>
+
+      <div class="section-head"><span class="section-title small">Longueur</span></div>
+      <div id="opt-longueur" class="chips"></div>
+
+      <div class="section-head"><span class="section-title small">Destinataire</span></div>
+      <div id="opt-destinataire" class="chips"></div>
+    </details>
+
+    <div class="section-head"><span class="section-title">Actions</span><span class="muted">choisissez, puis ➤</span></div>
+    <section id="actions" class="actions"></section>
+
+    <div class="section-head"><span class="section-title">Rédiger en style</span></div>
+    <section id="styles" class="actions"></section>
 
     <section class="card source">
       <div class="source-head">
@@ -90,28 +133,21 @@
       <textarea id="manual-text" rows="4" placeholder="Collez votre texte ici" hidden></textarea>
     </section>
 
-    <section class="tons-box">
-      <div class="section-head">
-        <span class="section-title">Ton</span>
-        <span id="tons-info" class="muted"></span>
-        <button id="btn-tons-clear" class="link-btn" hidden>Tout décocher</button>
-      </div>
-      <div id="tons" class="chips"></div>
-    </section>
-
-    <div class="section-head"><span class="section-title">Actions</span></div>
-    <section id="actions" class="actions"></section>
-
-    <div class="section-head"><span class="section-title">Rédiger en style</span></div>
-    <section id="styles" class="actions"></section>
-
     <section id="chat" class="chat"></section>
   </main>
 
-  <!-- SAISIE LIBRE -->
-  <footer class="composer">
-    <textarea id="prompt" rows="2" placeholder="Une question ou une consigne… (Entrée pour envoyer)"></textarea>
-    <button id="btn-send" class="primary send" title="Envoyer">➤</button>
+  <!-- SAISIE ET LANCEMENT -->
+  <footer class="composer-wrap">
+    <div class="composer-bar">
+      <span id="sel-pill" class="sel-pill" hidden></span>
+      <label class="toggle two-versions" title="L'IA propose deux versions différentes pour choisir la meilleure (deux fois plus long)">
+        <input type="checkbox" id="two-versions"> 2 versions
+      </label>
+    </div>
+    <div class="composer">
+      <textarea id="prompt" rows="2" placeholder="Une question ou une consigne…"></textarea>
+      <button id="btn-send" class="primary send" title="Lancer">➤</button>
+    </div>
   </footer>
 
   <div id="toast" class="toast" hidden></div>

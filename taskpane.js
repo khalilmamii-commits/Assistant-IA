@@ -59,6 +59,25 @@ const TONS = [
   { label: "Pédagogique",  consigne: "explique simplement, définit les termes techniques" },
 ];
 
+/* Choix uniques (un seul à la fois, cliquer à nouveau pour désélectionner) */
+const FORMES = [
+  { label: "Puces",        consigne: "présente le résultat sous forme de liste à tirets, une idée par ligne" },
+  { label: "Texte rédigé", consigne: "rédige en paragraphes continus, sans liste à puces" },
+  { label: "Mixte",        consigne: "combine une courte introduction rédigée, une liste à tirets pour les points clés, puis une phrase de conclusion" },
+];
+const LONGUEURS = [
+  { label: "Plus court", consigne: "nettement plus court que le texte d'origine" },
+  { label: "Identique",  consigne: "longueur proche de celle du texte d'origine" },
+  { label: "Plus long",  consigne: "plus développé que le texte d'origine, sans inventer de faits" },
+];
+const DESTINATAIRES = [
+  { label: "Maître d'ouvrage",   consigne: "un maître d'ouvrage : clair, orienté décisions, coûts, délais et risques" },
+  { label: "Élus",               consigne: "des élus : accessible, orienté enjeux pour le territoire et les usagers, peu de jargon" },
+  { label: "Grand public",       consigne: "le grand public : simple, sans jargon, termes techniques expliqués" },
+  { label: "Collègue technique", consigne: "un collègue ingénieur : technique, précis, vocabulaire du métier" },
+];
+
+
 /* ---------------------------------------------------------------------
    2. RÉGLAGES PAR DÉFAUT (modifiables ensuite dans ⚙)
 --------------------------------------------------------------------- */
@@ -66,6 +85,8 @@ const DEFAULTS = {
   provider: "lmstudio",                 // "lmstudio" ou "claude"
   lmsUrl: "http://localhost:1234/v1",   // adresse du serveur LM Studio
   lmsModel: "",                         // vide = modèle chargé dans LM Studio
+  rules: "",                            // règles perso, une par ligne
+  protectedTerms: "",                   // termes à ne jamais modifier, un par ligne
   apiKey: "",                           // clé API Anthropic (moteur Claude)
   model: "claude-sonnet-5-5",           // modèle Claude
   context: "Je suis ingénieur routier / VRD. Mes documents sont des rapports d'études techniques (AVP, PRO, DCE), des notes et des mémoires techniques.",
@@ -74,7 +95,9 @@ const DEFAULTS = {
 const MAX_TOKENS_CLAUDE = 8192;   // longueur maximale d'une réponse Claude
 const MAX_SOURCE_CHARS = 200000;  // au-delà, le texte est tronqué
 const STORAGE_KEY = "assistant-ia-word.settings";
-const TONS_KEY = "assistant-ia-word.tons";
+const OPTIONS_KEY = "assistant-ia-word.options";
+const HISTORY_KEY = "assistant-ia-word.historique";
+const HISTORY_MAX = 30;
 const PLACEHOLDER_URL = "https://VOTRE-PSEUDO.github.io/assistant-ia-word";
 
 /* ---------------------------------------------------------------------
@@ -87,14 +110,19 @@ let lastSentSource = null;   // pour ne pas renvoyer le même texte à chaque re
 let controller = null;       // permet d'arrêter une réponse en cours
 let autoModelCache = {};     // modèle LM Studio détecté automatiquement
 let started = false;
-let tonsActifs = loadTons();
+let options = loadOptions();     // { tons: [], forme, longueur, destinataire }
+let selectedAction = null;       // action choisie, lancée par le bouton bleu
 
 const $ = (id) => document.getElementById(id);
 const els = {
   main: $("main"), settings: $("settings"), chat: $("chat"), actions: $("actions"),
   preview: $("selection-preview"), manual: $("manual-text"), wholeDoc: $("whole-doc"),
   prompt: $("prompt"), send: $("btn-send"), banner: $("browser-banner"), toast: $("toast"),
-  badge: $("engine-badge"), styles: $("styles"), tons: $("tons"), tonsInfo: $("tons-info"),
+  badge: $("engine-badge"), styles: $("styles"), tons: $("tons"),
+  forme: $("opt-forme"), longueur: $("opt-longueur"), destinataire: $("opt-destinataire"),
+  optionsSummary: $("options-summary"), selPill: $("sel-pill"), twoVersions: $("two-versions"),
+  rules: $("set-rules"), protectedTerms: $("set-protected"),
+  historyPanel: $("history-panel"), historyList: $("history-list"),
   provider: $("set-provider"), cfgLms: $("cfg-lmstudio"), cfgClaude: $("cfg-claude"),
   lmsUrl: $("set-lms-url"), lmsModel: $("set-lms-model"), testResult: $("test-result"),
   key: $("set-key"), model: $("set-model"), context: $("set-context"),
@@ -113,11 +141,22 @@ function start(inWord) {
     b.className = "action";
     b.textContent = a.label;
     b.title = a.consigne;
-    b.addEventListener("click", () => runAction(a));
+    b.addEventListener("click", () => selectAction(selectedAction === a ? null : a));
+    a.button = b;
     (a.groupe === "style" ? els.styles : els.actions).appendChild(b);
   });
-  renderTons();
-  $("btn-tons-clear").addEventListener("click", () => { tonsActifs = []; saveTons(); renderTons(); });
+  renderOptions();
+  $("btn-options-clear").addEventListener("click", () => {
+    options = { tons: [], forme: "", longueur: "", destinataire: "" };
+    saveOptions(); renderOptions();
+  });
+  els.selPill.addEventListener("click", () => selectAction(null));
+  $("btn-history").addEventListener("click", openHistory);
+  $("btn-history-close").addEventListener("click", closeHistory);
+  $("btn-history-clear").addEventListener("click", () => {
+    try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
+    renderHistory();
+  });
 
   $("btn-settings").addEventListener("click", openSettings);
   $("btn-cancel").addEventListener("click", closeSettings);
@@ -126,9 +165,9 @@ function start(inWord) {
   $("btn-test").addEventListener("click", testLMStudio);
   $("btn-manifest").addEventListener("click", downloadManifest);
   els.provider.addEventListener("change", showProviderFields);
-  els.send.addEventListener("click", () => (controller ? stopGeneration() : sendPrompt()));
+  els.send.addEventListener("click", () => (controller ? stopGeneration() : launch()));
   els.prompt.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!controller) sendPrompt(); }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!controller) launch(); }
   });
   els.wholeDoc.addEventListener("change", refreshPreview);
 
@@ -223,32 +262,57 @@ async function wordComment(text) {
 /* ---------------------------------------------------------------------
    7. ACTIONS ET CONVERSATION
 --------------------------------------------------------------------- */
-async function runAction(action) {
+// Bouton bleu : lance l'action choisie, ou la consigne libre
+async function launch() {
   if (controller) return;
-  const source = await safeGetSource();
-  if (source === null) return;
-  if (!source) {
-    toast(IN_WORD ? "Sélectionnez d'abord du texte dans Word." : "Collez d'abord un texte.");
-    return;
+  const extra = els.prompt.value.trim();
+  if (selectedAction) {
+    const action = selectedAction;
+    const ok = await runAction(action, extra);
+    if (ok) { els.prompt.value = ""; selectAction(null); }
+  } else if (extra) {
+    await sendPrompt(extra);
+  } else {
+    toast("Choisissez une action, ou écrivez une consigne.");
   }
-  newConversation(); // une action rapide démarre une conversation neuve
-  lastSentSource = source;
-  const consigne = action.consigne + (action.tons === false ? "" : tonsConsigne());
-  const label = action.label + (action.tons === false || !tonsActifs.length ? "" : " · " + tonsActifs.join(", "));
-  await ask(buildMessage(consigne, source), label, source.length, action.mode, source);
 }
 
-async function sendPrompt() {
-  const question = els.prompt.value.trim();
-  if (!question) return;
+function selectAction(action) {
+  selectedAction = action;
+  ACTIONS.forEach((a) => a.button.classList.toggle("selected", a === action));
+  els.selPill.hidden = !action;
+  els.selPill.textContent = action ? "Action : " + action.label + "  ✕" : "";
+  els.send.classList.toggle("ready", !!action);
+}
+
+async function runAction(action, extra) {
+  const source = await safeGetSource();
+  if (source === null) return false;
+  if (!source) {
+    toast(IN_WORD ? "Sélectionnez d'abord du texte dans Word." : "Collez d'abord un texte dans « Texte ciblé ».");
+    return false;
+  }
+  newConversation(); // une action démarre une conversation neuve
+  lastSentSource = source;
+  const avecOptions = action.tons !== false;
+  let consigne = action.consigne;
+  if (extra) consigne += "\n\nConsigne complémentaire de l'utilisateur : " + extra;
+  if (avecOptions) consigne += optionsConsigne();
+  const resume = avecOptions ? optionsResume() : "";
+  const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "");
+  await ask(buildMessage(consigne, source), label, source.length, action.mode, source, action.label);
+  return true;
+}
+
+async function sendPrompt(question) {
   const source = await safeGetSource();
   if (source === null) return;
   // On joint le texte ciblé seulement s'il a changé depuis le dernier envoi
   const attach = source && source !== lastSentSource;
   if (attach) lastSentSource = source;
   els.prompt.value = "";
-  const consigne = question + tonsConsigne();
-  await ask(attach ? buildMessage(consigne, source) : consigne, question, attach ? source.length : 0, "texte");
+  const consigne = question + optionsConsigne();
+  await ask(attach ? buildMessage(consigne, source) : consigne, question, attach ? source.length : 0, "texte", attach ? source : lastSentSource, "Question");
 }
 
 function buildMessage(consigne, source) {
@@ -275,7 +339,7 @@ function newConversation() {
   els.chat.innerHTML = "";
 }
 
-async function ask(content, displayLabel, attachedChars, mode, source) {
+async function ask(content, displayLabel, attachedChars, mode, source, historyLabel) {
   if (settings.provider === "claude" && !settings.apiKey) {
     openSettings();
     toast("Ajoutez d'abord votre clé API Claude.");
@@ -284,47 +348,76 @@ async function ask(content, displayLabel, attachedChars, mode, source) {
 
   addUserBubble(displayLabel, attachedChars);
   history.push({ role: "user", content });
-
-  const bubble = addAssistantBubble();
+  const versions = els.twoVersions.checked ? 2 : 1;
+  const call = settings.provider === "claude" ? callClaude : callLMStudio;
+  let firstAnswer = null;
   setBusy(true);
-  controller = new AbortController();
-  let raw = "";
-  try {
-    const call = settings.provider === "claude" ? callClaude : callLMStudio;
-    await call(history, (chunk) => {
-      raw += chunk;
-      bubble.body.textContent = withoutThinking(raw) || "Réflexion…";
-      scrollToBottom();
-    }, controller.signal);
-    const answer = cleanText(withoutThinking(raw));
-    if (!answer) throw new Error("Le modèle n'a renvoyé aucun texte.");
-    history.push({ role: "assistant", content: answer });
-    if (mode === "correction" && source !== undefined) {
-      showCorrection(bubble, source, answer);
-    } else {
-      bubble.body.textContent = answer;
-      addTools(bubble, answer, mode);
-    }
-  } catch (e) {
-    const partial = cleanText(withoutThinking(raw));
-    if (e.name === "AbortError") {
-      bubble.body.textContent = partial + (partial ? "\n\n" : "") + "[Réponse interrompue]";
-      if (partial) {
-        history.push({ role: "assistant", content: partial });
-        addTools(bubble, partial, mode);
+
+  for (let v = 1; v <= versions; v++) {
+    const bubble = addAssistantBubble(versions > 1 ? "Version " + v : "");
+    controller = new AbortController();
+    let raw = "";
+    let stop = false;
+    try {
+      // La 2e version est générée avec plus de créativité pour être différente
+      await call(history, (chunk) => {
+        raw += chunk;
+        bubble.body.textContent = withoutThinking(raw) || "Réflexion…";
+        scrollToBottom();
+      }, controller.signal, v === 1 ? 0.4 : 0.9);
+      const answer = cleanText(withoutThinking(raw));
+      if (!answer) throw new Error("Le modèle n'a renvoyé aucun texte.");
+      if (firstAnswer === null) firstAnswer = answer;
+      showAnswer(bubble, answer, mode, source);
+      saveToHistory(historyLabel || "Résultat", answer, mode, source);
+    } catch (e) {
+      const partial = cleanText(withoutThinking(raw));
+      if (e.name === "AbortError") {
+        bubble.body.textContent = partial + (partial ? "\n\n" : "") + "[Réponse interrompue]";
+        if (partial) {
+          if (firstAnswer === null) firstAnswer = partial;
+          addTools(bubble, partial, mode);
+        }
       } else {
-        history.pop();
+        bubble.root.remove();
+        showError(e.message);
       }
-    } else {
-      bubble.root.remove();
-      history.pop();
-      showError(e.message);
+      stop = true;
+    } finally {
+      bubble.body.classList.remove("streaming");
     }
-  } finally {
-    bubble.body.classList.remove("streaming");
-    setBusy(false);
-    scrollToBottom();
+    if (stop) break;
   }
+
+  if (firstAnswer !== null) history.push({ role: "assistant", content: firstAnswer });
+  else history.pop();
+  setBusy(false);
+  scrollToBottom();
+}
+
+function showAnswer(bubble, answer, mode, source) {
+  if (mode === "correction" && source) {
+    showCorrection(bubble, source, answer);
+  } else {
+    bubble.body.textContent = answer;
+    addTools(bubble, answer, mode);
+  }
+  checkProtectedTerms(bubble, source, answer);
+}
+
+// Avertit si un terme protégé présent dans le texte d'origine a disparu
+function checkProtectedTerms(bubble, source, answer) {
+  if (!source || /^(phrase|texte) correct/i.test(answer)) return;
+  const missing = protectedList().filter((t) => source.includes(t) && !answer.includes(t));
+  if (!missing.length) return;
+  const w = document.createElement("div");
+  w.className = "warn";
+  w.textContent = "⚠ Terme protégé modifié ou absent : " + missing.join(", ") + ". Vérifiez avant d'insérer.";
+  bubble.root.insertBefore(w, bubble.body.nextSibling);
+}
+
+function protectedList() {
+  return (settings.protectedTerms || "").split(/\n|;/).map((t) => t.trim()).filter(Boolean);
 }
 
 /* ---------------------------------------------------------------------
@@ -347,20 +440,38 @@ function systemPrompt() {
     "- Conserve exactement les valeurs, unités, références et termes techniques du texte d'origine (ex. bordures T2, GNT 0/31.5, EB 10, PR, RN568).",
     "- Utilise le vocabulaire professionnel du métier : chaussée, structure, couche de roulement, assainissement pluvial, dévoiement de réseaux, maîtrise d'ouvrage, maîtrise d'œuvre.",
   ];
+  const rules = (settings.rules || "").split("\n").map((r) => r.trim()).filter(Boolean);
+  if (rules.length) lines.push("", "Règles personnelles de l'utilisateur (à respecter toujours) :", ...rules.map((r) => "- " + r));
+  const prot = protectedList();
+  if (prot.length) lines.push("", "Termes à recopier exactement, sans jamais les modifier, traduire ni reformuler : " + prot.join(" ; "));
   if (settings.context) lines.push("", "Contexte de l'utilisateur : " + settings.context);
   return lines.join("\n");
 }
 
-// Consigne ajoutée à la demande selon les tons cochés
-function tonsConsigne() {
-  if (!tonsActifs.length) return "";
-  const choisis = TONS.filter((t) => tonsActifs.includes(t.label));
-  let txt = "\n\nTon à appliquer (tous en même temps, sans contredire les règles de fiabilité) :\n" +
-    choisis.map((t) => "- " + t.label + " : " + t.consigne).join("\n");
-  if (tonsActifs.includes("Optimiste") && tonsActifs.includes("Pessimiste")) {
-    txt += "\nOptimiste et pessimiste se contredisent : équilibre-les en présentant les points positifs et les points de vigilance.";
+// Consignes ajoutées à la demande selon les réglages du texte
+function optionsConsigne() {
+  const parts = [];
+  if (options.tons.length) {
+    const choisis = TONS.filter((t) => options.tons.includes(t.label));
+    let txt = "Ton (applique-les tous en même temps, sans contredire les règles de fiabilité) :\n" +
+      choisis.map((t) => "- " + t.label + " : " + t.consigne).join("\n");
+    if (options.tons.includes("Optimiste") && options.tons.includes("Pessimiste")) {
+      txt += "\nOptimiste et pessimiste se contredisent : équilibre-les en présentant les points positifs et les points de vigilance.";
+    }
+    parts.push(txt);
   }
-  return txt;
+  const one = (list, val, titre) => {
+    const o = list.find((x) => x.label === val);
+    if (o) parts.push(titre + " : " + o.consigne + ".");
+  };
+  one(FORMES, options.forme, "Forme");
+  one(LONGUEURS, options.longueur, "Longueur");
+  one(DESTINATAIRES, options.destinataire, "Destinataire : adapte le texte pour");
+  return parts.length ? "\n\n" + parts.join("\n\n") : "";
+}
+
+function optionsResume() {
+  return options.tons.concat([options.forme, options.longueur, options.destinataire].filter(Boolean)).join(", ");
 }
 
 /* ---------------------------------------------------------------------
@@ -404,7 +515,7 @@ async function listLMStudioModels(base) {
   return (data.data || []).map((m) => m.id).filter((id) => !/embed/i.test(id));
 }
 
-async function callLMStudio(messages, onText, signal) {
+async function callLMStudio(messages, onText, signal, temperature) {
   const base = lmsBase();
   let model = settings.lmsModel;
   if (!model) {
@@ -425,7 +536,7 @@ async function callLMStudio(messages, onText, signal) {
       body: JSON.stringify({
         model,
         messages: [{ role: "system", content: systemPrompt() }].concat(messages.slice(-20)),
-        temperature: 0.4,
+        temperature: temperature || 0.4,
         stream: true,
       }),
     }, networkOptions(base)));
@@ -485,7 +596,7 @@ async function testLMStudio() {
 /* ---------------------------------------------------------------------
    10. MOTEUR CLAUDE (API Anthropic)
 --------------------------------------------------------------------- */
-async function callClaude(messages, onText, signal) {
+async function callClaude(messages, onText, signal) { // (la variété vient du modèle)
   let res;
   try {
     res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -577,9 +688,15 @@ function addUserBubble(label, attachedChars) {
   scrollToBottom();
 }
 
-function addAssistantBubble() {
+function addAssistantBubble(title) {
   const root = document.createElement("div");
   root.className = "msg assistant";
+  if (title) {
+    const t = document.createElement("div");
+    t.className = "version-title";
+    t.textContent = title;
+    root.appendChild(t);
+  }
   const body = document.createElement("div");
   body.className = "body streaming";
   root.appendChild(body);
@@ -626,7 +743,7 @@ function setBusy(busy) {
   els.send.textContent = busy ? "■" : "➤";
   els.send.title = busy ? "Arrêter" : "Envoyer";
   els.send.classList.toggle("stop", busy);
-  document.querySelectorAll(".action").forEach((b) => (b.disabled = busy));
+  document.querySelectorAll(".action, .chip").forEach((b) => (b.disabled = busy));
   if (!busy) controller = null;
 }
 
@@ -673,7 +790,10 @@ function openSettings() {
   els.key.value = settings.apiKey;
   els.model.value = settings.model;
   els.context.value = settings.context;
+  els.rules.value = settings.rules || "";
+  els.protectedTerms.value = settings.protectedTerms || "";
   els.testResult.hidden = true;
+  els.historyPanel.hidden = true;
   showProviderFields();
   els.settings.hidden = false;
   els.main.hidden = true;
@@ -681,7 +801,7 @@ function openSettings() {
 
 function closeSettings() {
   els.settings.hidden = true;
-  els.main.hidden = false;
+  els.main.hidden = !els.historyPanel.hidden;
 }
 
 function saveSettings() {
@@ -692,6 +812,8 @@ function saveSettings() {
     apiKey: els.key.value.trim(),
     model: els.model.value.trim() || DEFAULTS.model,
     context: els.context.value.trim(),
+    rules: els.rules.value.trim(),
+    protectedTerms: els.protectedTerms.value.trim(),
     saved: true,
   };
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch (_) {}
@@ -729,30 +851,103 @@ async function downloadManifest() {
 /* ---------------------------------------------------------------------
    TONS : affichage et mémorisation
 --------------------------------------------------------------------- */
-function loadTons() {
-  try { return JSON.parse(localStorage.getItem(TONS_KEY) || "[]"); } catch (_) { return []; }
+function loadOptions() {
+  const d = { tons: [], forme: "", longueur: "", destinataire: "" };
+  try { return Object.assign(d, JSON.parse(localStorage.getItem(OPTIONS_KEY) || "{}")); } catch (_) { return d; }
 }
-function saveTons() {
-  try { localStorage.setItem(TONS_KEY, JSON.stringify(tonsActifs)); } catch (_) {}
+function saveOptions() {
+  try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
 }
-function renderTons() {
+
+function chip(label, on, title, onClick) {
+  const b = document.createElement("button");
+  b.className = "chip" + (on ? " on" : "");
+  b.textContent = (on ? "✓ " : "") + label;
+  b.title = title;
+  b.setAttribute("aria-pressed", on);
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function renderOptions() {
+  // Tons : plusieurs choix
   els.tons.innerHTML = "";
   TONS.forEach((t) => {
-    const b = document.createElement("button");
-    const on = tonsActifs.includes(t.label);
-    b.className = "chip" + (on ? " on" : "");
-    b.textContent = (on ? "✓ " : "") + t.label;
-    b.title = t.consigne;
-    b.setAttribute("aria-pressed", on);
-    b.addEventListener("click", () => {
-      tonsActifs = on ? tonsActifs.filter((x) => x !== t.label) : tonsActifs.concat(t.label);
-      saveTons();
-      renderTons();
-    });
-    els.tons.appendChild(b);
+    const on = options.tons.includes(t.label);
+    els.tons.appendChild(chip(t.label, on, t.consigne, () => {
+      options.tons = on ? options.tons.filter((x) => x !== t.label) : options.tons.concat(t.label);
+      saveOptions(); renderOptions();
+    }));
   });
-  els.tonsInfo.textContent = tonsActifs.length ? tonsActifs.length + " coché(s)" : "aucun";
-  $("btn-tons-clear").hidden = !tonsActifs.length;
+  // Forme, longueur, destinataire : un seul choix
+  [["forme", FORMES, els.forme], ["longueur", LONGUEURS, els.longueur], ["destinataire", DESTINATAIRES, els.destinataire]]
+    .forEach(([key, list, box]) => {
+      box.innerHTML = "";
+      list.forEach((o) => {
+        const on = options[key] === o.label;
+        box.appendChild(chip(o.label, on, o.consigne, () => {
+          options[key] = on ? "" : o.label;
+          saveOptions(); renderOptions();
+        }));
+      });
+    });
+  const r = optionsResume();
+  els.optionsSummary.textContent = r ? "· " + r : "· aucun";
+  $("btn-options-clear").hidden = !r;
+}
+
+/* ---------------------------------------------------------------------
+   HISTORIQUE des résultats (30 derniers, sur cet ordinateur)
+--------------------------------------------------------------------- */
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch (_) { return []; }
+}
+
+function saveToHistory(label, answer, mode, source) {
+  if (/^(phrase|texte) correct/i.test(answer)) return;
+  const list = loadHistory();
+  list.unshift({ date: new Date().toISOString(), label, answer, mode, source: (source || "").slice(0, 1500) });
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX))); } catch (_) {}
+}
+
+function openHistory() {
+  closeSettings();
+  renderHistory();
+  els.historyPanel.hidden = false;
+  els.main.hidden = true;
+}
+
+function closeHistory() {
+  els.historyPanel.hidden = true;
+  els.main.hidden = false;
+}
+
+function renderHistory() {
+  const list = loadHistory();
+  els.historyList.innerHTML = "";
+  if (!list.length) {
+    els.historyList.innerHTML = '<p class="hint">Aucun résultat pour l\'instant.</p>';
+    return;
+  }
+  list.forEach((h) => {
+    const item = document.createElement("div");
+    item.className = "hist-item";
+    const head = document.createElement("div");
+    head.className = "hist-head";
+    const d = new Date(h.date);
+    head.textContent = h.label + " — " + d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const body = document.createElement("div");
+    body.className = "hist-body";
+    body.textContent = h.answer;
+    item.append(head, body);
+    item.addEventListener("click", () => {
+      if (item.classList.contains("open")) return;
+      item.classList.add("open");
+      const bubble = { root: item, body };
+      addTools(bubble, h.answer, h.mode === "explication" ? "explication" : "texte");
+    });
+    els.historyList.appendChild(item);
+  });
 }
 
 /* ---------------------------------------------------------------------
