@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assistant IA</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand"><span class="logo">✦</span> Assistant IA <span id="engine-badge" class="badge"></span></div>
+    <div class="topbar-actions">
+      <button id="btn-new" class="icon-btn" title="Nouvelle conversation">↺</button>
+      <button id="btn-settings" class="icon-btn" title="Paramètres">⚙</button>
+    </div>
+  </header>
+
+  <!-- PARAMÈTRES -->
+  <section id="settings" class="settings" hidden>
+    <h2>Paramètres</h2>
+
+    <label>Moteur IA
+      <select id="set-provider">
+        <option value="lmstudio">LM Studio — sur votre PC, gratuit</option>
+        <option value="claude">Claude — API Anthropic, payant</option>
+      </select>
+    </label>
+
+    <!-- Réglages LM Studio -->
+    <div id="cfg-lmstudio">
+      <label>Adresse du serveur
+        <input id="set-lms-url" placeholder="http://localhost:1234/v1" autocomplete="off">
+      </label>
+      <p class="hint">C'est l'adresse affichée dans LM Studio, onglet Developer. Laissez la valeur par défaut si vous ne l'avez pas changée.</p>
+
+      <label>Modèle
+        <select id="set-lms-model">
+          <option value="">Automatique (modèle chargé dans LM Studio)</option>
+        </select>
+      </label>
+
+      <button id="btn-test" class="ghost test-btn">Tester la connexion</button>
+      <p id="test-result" class="test-result" hidden></p>
+    </div>
+
+    <!-- Réglages Claude -->
+    <div id="cfg-claude" hidden>
+      <label>Clé API Anthropic
+        <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
+      </label>
+      <p class="hint">Créez-la sur console.anthropic.com → API Keys. Elle reste enregistrée uniquement sur cet ordinateur.</p>
+
+      <label>Modèle
+        <input id="set-model" list="models" placeholder="claude-sonnet-5-5">
+        <datalist id="models">
+          <option value="claude-sonnet-5-5">Sonnet 5.5 — recommandé</option>
+          <option value="claude-haiku-5-5">Haiku 5.5 — rapide et économique</option>
+          <option value="claude-opus-5-5">Opus 5.5 — le plus puissant</option>
+        </datalist>
+      </label>
+    </div>
+
+    <label>Votre contexte (optionnel)
+      <textarea id="set-context" rows="4"></textarea>
+    </label>
+    <p class="hint">Ce texte est donné à l'IA à chaque demande pour adapter le vocabulaire.</p>
+
+    <div class="row">
+      <button id="btn-save" class="primary">Enregistrer</button>
+      <button id="btn-cancel" class="ghost">Fermer</button>
+    </div>
+  </section>
+
+  <!-- ZONE PRINCIPALE -->
+  <main id="main" class="main">
+
+    <div id="browser-banner" class="banner" hidden>
+      <strong>Mode test hors de Word.</strong> Collez un texte ci-dessous pour essayer.
+      <button id="btn-manifest" class="primary manifest-btn" hidden>⬇ Télécharger le manifeste pour Word</button>
+    </div>
+
+    <section class="card source">
+      <div class="source-head">
+        <span class="source-title">Texte ciblé</span>
+        <label class="toggle"><input type="checkbox" id="whole-doc"> Tout le document</label>
+      </div>
+      <div id="selection-preview" class="preview empty">Sélectionnez du texte dans Word…</div>
+      <textarea id="manual-text" rows="4" placeholder="Collez votre texte ici" hidden></textarea>
+    </section>
+
+    <section class="tons-box">
+      <div class="section-head">
+        <span class="section-title">Ton</span>
+        <span id="tons-info" class="muted"></span>
+        <button id="btn-tons-clear" class="link-btn" hidden>Tout décocher</button>
+      </div>
+      <div id="tons" class="chips"></div>
+    </section>
+
+    <div class="section-head"><span class="section-title">Actions</span></div>
+    <section id="actions" class="actions"></section>
+
+    <div class="section-head"><span class="section-title">Rédiger en style</span></div>
+    <section id="styles" class="actions"></section>
+
+    <section id="chat" class="chat"></section>
+  </main>
+
+  <!-- SAISIE LIBRE -->
+  <footer class="composer">
+    <textarea id="prompt" rows="2" placeholder="Une question ou une consigne… (Entrée pour envoyer)"></textarea>
+    <button id="btn-send" class="primary send" title="Envoyer">➤</button>
+  </footer>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
