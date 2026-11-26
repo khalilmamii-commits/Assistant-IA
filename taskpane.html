@@ -12,6 +12,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo">✦</span> Assistant IA <span id="engine-badge" class="badge"></span></div>
     <div class="topbar-actions">
+      <button id="btn-docs" class="icon-btn" title="Documents de référence">📄<span id="docs-count" class="count-dot" hidden></span></button>
       <button id="btn-history" class="icon-btn" title="Historique des résultats">🕘</button>
       <button id="btn-new" class="icon-btn" title="Nouvelle conversation">↺</button>
       <button id="btn-settings" class="icon-btn" title="Paramètres">⚙</button>
@@ -73,9 +74,34 @@
     </label>
     <p class="hint">Noms de lieux, références, codes… L'IA doit les recopier tels quels. Un avertissement s'affiche si l'un d'eux disparaît.</p>
 
+    <label>Sauvegarde des réglages</label>
+    <p class="hint">Exporte vos réglages, favoris, règles et termes protégés (sans la clé API), pour les garder ou les partager avec un collègue.</p>
+    <div class="row tight">
+      <button id="btn-export" class="ghost">⬇ Exporter</button>
+      <button id="btn-import" class="ghost">⬆ Importer</button>
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
+    </div>
+
     <div class="row">
       <button id="btn-save" class="primary">Enregistrer</button>
       <button id="btn-cancel" class="ghost">Fermer</button>
+    </div>
+  </section>
+
+  <!-- DOCUMENTS -->
+  <section id="docs-panel" class="settings" hidden>
+    <h2>Documents de référence</h2>
+    <p class="hint">Déposez vos pièces (CCTP, RC, rapports…) en PDF, Word ou texte. L'IA s'appuie sur les passages utiles et cite la source. Les documents restent sur cet ordinateur.</p>
+    <label class="drop" id="drop-zone">
+      <input type="file" id="docs-input" multiple accept=".pdf,.docx,.txt,.md" hidden>
+      <span>📂 Cliquez ou glissez vos fichiers ici</span>
+      <small>PDF, Word (.docx), texte</small>
+    </label>
+    <p id="docs-status" class="hint"></p>
+    <div id="docs-list" class="history-list"></div>
+    <div class="row">
+      <button id="btn-docs-close" class="primary">Fermer</button>
+      <button id="btn-docs-clear" class="ghost">Tout retirer</button>
     </div>
   </section>
 
@@ -97,6 +123,19 @@
       <strong>Mode test hors de Word.</strong> Collez un texte dans « Texte ciblé » pour essayer.
       <button id="btn-manifest" class="primary manifest-btn" hidden>⬇ Télécharger le manifeste pour Word</button>
     </div>
+
+    <section class="favs">
+      <div class="section-head">
+        <span class="section-title">★ Favoris</span>
+        <button id="btn-fav-add" class="link-btn">+ Enregistrer les réglages actuels</button>
+      </div>
+      <div id="fav-form" class="fav-form" hidden>
+        <input id="fav-name" placeholder="Nom du favori, ex. Rapport MOA" maxlength="40">
+        <button id="btn-fav-ok" class="primary">OK</button>
+        <button id="btn-fav-cancel" class="ghost">✕</button>
+      </div>
+      <div id="fav-list" class="chips"></div>
+    </section>
 
     <details id="options-box" class="options-box" open>
       <summary><span class="section-title">Réglages du texte</span> <span id="options-summary" class="muted"></span></summary>
@@ -129,9 +168,22 @@
         <span class="source-title">Texte ciblé</span>
         <label class="toggle"><input type="checkbox" id="whole-doc"> Tout le document</label>
       </div>
+      <div class="source-tools">
+        <label class="switch" id="follow-wrap" title="Activé : la sélection Word est reprise automatiquement. Désactivé : le texte reste figé.">
+          <input type="checkbox" id="follow-sel" checked><span class="slider"></span> Suivre la sélection Word
+        </label>
+        <button id="btn-copy-source" class="link-btn">Copier</button>
+      </div>
       <div id="selection-preview" class="preview empty">Sélectionnez du texte dans Word…</div>
       <textarea id="manual-text" rows="4" placeholder="Collez votre texte ici" hidden></textarea>
     </section>
+
+    <div id="nav-bar" class="nav-bar" hidden>
+      <button id="nav-prev" class="nav-btn" title="Résultat précédent">←</button>
+      <span id="nav-pos"></span>
+      <button id="nav-next" class="nav-btn" title="Résultat suivant">→</button>
+    </div>
+    <section id="browse" class="browse" hidden></section>
 
     <section id="chat" class="chat"></section>
   </main>
@@ -140,6 +192,9 @@
   <footer class="composer-wrap">
     <div class="composer-bar">
       <span id="sel-pill" class="sel-pill" hidden></span>
+      <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents de référence">
+        <input type="checkbox" id="use-docs" checked> 📄 Documents
+      </label>
       <label class="toggle two-versions" title="L'IA propose deux versions différentes pour choisir la meilleure (deux fois plus long)">
         <input type="checkbox" id="two-versions"> 2 versions
       </label>

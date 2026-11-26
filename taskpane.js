@@ -36,10 +36,14 @@ const ACTIONS = [
     consigne: "Réécris ce texte dans le style d'un rapport d'étude (diagnostic, AVP, PRO) : neutre, impersonnel et argumenté. Présente l'existant, analyse, puis conclut." },
   { label: "Notice explicative", mode: "texte", groupe: "style",
     consigne: "Réécris ce texte dans le style d'une notice explicative : descriptive et concise. Explique ce qui est prévu (dispositions, matériaux, fonctionnement), sans argumenter." },
-  { label: "Document de marché", mode: "texte", groupe: "style",
-    consigne: "Réécris ce texte dans le style d'un document de marché (CCTP, mémoire technique) : précis, prescriptif, avec des formulations contractuelles (« L'entrepreneur devra… », « Le titulaire assurera… »)." },
+  { label: "Appel d'offres", mode: "texte", groupe: "style",
+    consigne: "Réécris ce texte dans le style d'une réponse à un appel d'offres (mémoire technique) : précis, engagé et vérifiable. Mets en avant la méthodologie, les moyens et les engagements du candidat, avec des formulations comme « Nous proposons… », « Notre équipe assurera… », « Le candidat s'engage à… »." },
   { label: "Mail", mode: "texte", groupe: "style",
     consigne: "Transforme ce texte en e-mail professionnel : courtois, clair et structuré (formule d'appel, objet en une phrase, demande ou information, formule de politesse)." },
+  { label: "Compte rendu", mode: "texte", groupe: "style",
+    consigne: "Réécris ce texte sous forme de compte rendu : factuel et structuré, avec l'objet, les participants s'ils sont mentionnés, les points abordés, les décisions prises et les actions à mener (qui, quoi, quand). N'invente aucun participant, aucune date ni aucune décision : écris [à compléter] si une information manque." },
+  { label: "Présentation", mode: "texte", groupe: "style",
+    consigne: "Réécris ce texte dans le style d'une présentation PowerPoint : phrases courtes et percutantes, centrées sur les mots-clés, prêtes à être collées dans une diapositive. Ne crée pas de diapositives complètes : transforme seulement ce texte." },
 ];
 
 /* ---------------------------------------------------------------------
@@ -58,6 +62,19 @@ const TONS = [
   { label: "Synthétique",  consigne: "va à l'essentiel, phrases courtes" },
   { label: "Pédagogique",  consigne: "explique simplement, définit les termes techniques" },
 ];
+
+/* Tons contraires : quand l'un est coché, les autres sont grisés */
+const TONS_EXCLUSIFS = [
+  ["Formel", "Informel", "Familier"],
+  ["Optimiste", "Pessimiste"],
+  ["Synthétique", "Pédagogique"],
+  ["Neutre", "Optimiste"], ["Neutre", "Pessimiste"], ["Neutre", "Persuasif"],
+];
+function tonsIncompatibles(label) {
+  const out = new Set();
+  TONS_EXCLUSIFS.forEach((g) => { if (g.includes(label)) g.forEach((x) => x !== label && out.add(x)); });
+  return out;
+}
 
 /* Choix uniques (un seul à la fois, cliquer à nouveau pour désélectionner) */
 const FORMES = [
@@ -98,6 +115,13 @@ const STORAGE_KEY = "assistant-ia-word.settings";
 const OPTIONS_KEY = "assistant-ia-word.options";
 const HISTORY_KEY = "assistant-ia-word.historique";
 const HISTORY_MAX = 30;
+const FAV_KEY = "assistant-ia-word.favoris";
+const DOCS_KEY = "assistant-ia-word.documents";
+const LIBS = {
+  pdf: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+  pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
+  docx: "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
+};
 const PLACEHOLDER_URL = "https://VOTRE-PSEUDO.github.io/assistant-ia-word";
 
 /* ---------------------------------------------------------------------
@@ -112,6 +136,9 @@ let autoModelCache = {};     // modèle LM Studio détecté automatiquement
 let started = false;
 let options = loadOptions();     // { tons: [], forme, longueur, destinataire }
 let selectedAction = null;       // action choisie, lancée par le bouton bleu
+let frozenSource = null;         // texte figé quand « Suivre la sélection » est désactivé
+let browseIndex = -1;            // -1 = conversation en cours ; sinon position dans l'historique
+let docs = loadDocs();           // documents de référence
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -123,6 +150,10 @@ const els = {
   optionsSummary: $("options-summary"), selPill: $("sel-pill"), twoVersions: $("two-versions"),
   rules: $("set-rules"), protectedTerms: $("set-protected"),
   historyPanel: $("history-panel"), historyList: $("history-list"),
+  docsPanel: $("docs-panel"), docsList: $("docs-list"), docsStatus: $("docs-status"), docsInput: $("docs-input"),
+  docsCount: $("docs-count"), useDocs: $("use-docs"), useDocsWrap: $("use-docs-wrap"),
+  favList: $("fav-list"), favForm: $("fav-form"), favName: $("fav-name"),
+  follow: $("follow-sel"), navBar: $("nav-bar"), navPos: $("nav-pos"), browse: $("browse"),
   provider: $("set-provider"), cfgLms: $("cfg-lmstudio"), cfgClaude: $("cfg-claude"),
   lmsUrl: $("set-lms-url"), lmsModel: $("set-lms-model"), testResult: $("test-result"),
   key: $("set-key"), model: $("set-model"), context: $("set-context"),
@@ -152,10 +183,39 @@ function start(inWord) {
   });
   els.selPill.addEventListener("click", () => selectAction(null));
   $("btn-history").addEventListener("click", openHistory);
-  $("btn-history-close").addEventListener("click", closeHistory);
+  $("btn-history-close").addEventListener("click", closePanels);
+  $("btn-docs").addEventListener("click", () => { renderDocs(); showPanel(els.docsPanel); });
+  $("btn-docs-close").addEventListener("click", closePanels);
+  $("btn-docs-clear").addEventListener("click", () => { docs = []; saveDocs(); renderDocs(); });
+  els.docsInput.addEventListener("change", () => { addDocuments([...els.docsInput.files]); els.docsInput.value = ""; });
+  const drop = $("drop-zone");
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); addDocuments([...e.dataTransfer.files]); });
+  $("btn-fav-add").addEventListener("click", () => { els.favForm.hidden = false; els.favName.value = ""; els.favName.focus(); });
+  $("btn-fav-cancel").addEventListener("click", () => (els.favForm.hidden = true));
+  $("btn-fav-ok").addEventListener("click", saveFavorite);
+  els.favName.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); saveFavorite(); } });
+  $("btn-export").addEventListener("click", exportSettings);
+  $("btn-import").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", importSettings);
+  $("btn-copy-source").addEventListener("click", async () => {
+    const t = await safeGetSource();
+    if (t) { await copyText(t); toast("Texte de départ copié ✓"); } else toast("Aucun texte à copier.");
+  });
+  els.follow.addEventListener("change", async () => {
+    frozenSource = null;
+    if (!els.follow.checked) frozenSource = await readWord();
+    refreshPreview();
+  });
+  $("nav-prev").addEventListener("click", () => navigate(+1));
+  $("nav-next").addEventListener("click", () => navigate(-1));
+  renderFavorites();
+  updateDocsBadge();
+  updateNav();
   $("btn-history-clear").addEventListener("click", () => {
     try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
-    renderHistory();
+    renderHistory(); exitBrowse();
   });
 
   $("btn-settings").addEventListener("click", openSettings);
@@ -183,12 +243,23 @@ function start(inWord) {
     els.preview.hidden = true;
     els.manual.hidden = false;
     els.wholeDoc.parentElement.hidden = true;
+    $("follow-wrap").hidden = true;
     // Bouton "Télécharger le manifeste" quand la page est en ligne (https)
     if (location.protocol === "https:") $("btn-manifest").hidden = false;
   }
 
   updateBadge();
   if (!settings.saved) openSettings();
+}
+
+/* Un seul panneau (paramètres, historique, documents) affiché à la fois */
+function showPanel(panel) {
+  [els.settings, els.historyPanel, els.docsPanel].forEach((p) => (p.hidden = p !== panel));
+  els.main.hidden = true;
+}
+function closePanels() {
+  [els.settings, els.historyPanel, els.docsPanel].forEach((p) => (p.hidden = true));
+  els.main.hidden = false;
 }
 
 if (typeof Office !== "undefined" && Office.onReady) {
@@ -203,6 +274,11 @@ if (typeof Office !== "undefined" && Office.onReady) {
 --------------------------------------------------------------------- */
 async function getSourceText() {
   if (!IN_WORD) return els.manual.value.trim();
+  if (!els.wholeDoc.checked && !els.follow.checked && frozenSource !== null) return frozenSource;
+  return readWord();
+}
+
+async function readWord() {
   return Word.run(async (ctx) => {
     const target = els.wholeDoc.checked ? ctx.document.body : ctx.document.getSelection();
     target.load("text");
@@ -224,7 +300,8 @@ async function refreshPreview() {
     els.preview.textContent = els.wholeDoc.checked ? "Tout le document" : text.slice(0, 280) + (text.length > 280 ? "…" : "");
     const c = document.createElement("span");
     c.className = "count";
-    c.textContent = text.length.toLocaleString("fr-FR") + " caractères";
+    const fige = !els.wholeDoc.checked && !els.follow.checked ? " · 🔒 figé" : "";
+    c.textContent = countWords(text).toLocaleString("fr-FR") + " mots · " + text.length.toLocaleString("fr-FR") + " caractères" + fige;
     els.preview.appendChild(c);
   } catch (e) {
     console.error(e);
@@ -265,6 +342,7 @@ async function wordComment(text) {
 // Bouton bleu : lance l'action choisie, ou la consigne libre
 async function launch() {
   if (controller) return;
+  if (browseIndex >= 0) exitBrowse();
   const extra = els.prompt.value.trim();
   if (selectedAction) {
     const action = selectedAction;
@@ -298,9 +376,10 @@ async function runAction(action, extra) {
   let consigne = action.consigne;
   if (extra) consigne += "\n\nConsigne complémentaire de l'utilisateur : " + extra;
   if (avecOptions) consigne += optionsConsigne();
+  const ref = action.mode === "correction" ? null : docsContext(source + " " + (extra || ""));
   const resume = avecOptions ? optionsResume() : "";
-  const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "");
-  await ask(buildMessage(consigne, source), label, source.length, action.mode, source, action.label);
+  const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "") + (ref ? "\n📄 " + ref.label : "");
+  await ask((ref ? ref.text : "") + buildMessage(consigne, source), label, source.length, action.mode, source, action.label);
   return true;
 }
 
@@ -312,7 +391,9 @@ async function sendPrompt(question) {
   if (attach) lastSentSource = source;
   els.prompt.value = "";
   const consigne = question + optionsConsigne();
-  await ask(attach ? buildMessage(consigne, source) : consigne, question, attach ? source.length : 0, "texte", attach ? source : lastSentSource, "Question");
+  const ref = docsContext(question + " " + (attach ? source : ""));
+  const content = (ref ? ref.text : "") + (attach ? buildMessage(consigne, source) : consigne);
+  await ask(content, question + (ref ? "\n📄 " + ref.label : ""), attach ? source.length : 0, "texte", attach ? source : lastSentSource, "Question");
 }
 
 function buildMessage(consigne, source) {
@@ -334,6 +415,7 @@ async function safeGetSource() {
 
 function newConversation() {
   stopGeneration();
+  if (browseIndex >= 0) exitBrowse();
   history = [];
   lastSentSource = null;
   els.chat.innerHTML = "";
@@ -403,6 +485,17 @@ function showAnswer(bubble, answer, mode, source) {
     addTools(bubble, answer, mode);
   }
   checkProtectedTerms(bubble, source, answer);
+  if (source && !/^(phrase|texte) correct/i.test(answer)) {
+    const wc = document.createElement("div");
+    wc.className = "wc";
+    wc.textContent = "Mots : " + countWords(source) + " → " + countWords(answer);
+    bubble.root.insertBefore(wc, bubble.body.nextSibling);
+  }
+  updateNav();
+}
+
+function countWords(t) {
+  return ((t || "").match(/[^\s«»"“”'’.,;:!?()\-–—]+/g) || []).length;
 }
 
 // Avertit si un terme protégé présent dans le texte d'origine a disparu
@@ -455,9 +548,6 @@ function optionsConsigne() {
     const choisis = TONS.filter((t) => options.tons.includes(t.label));
     let txt = "Ton (applique-les tous en même temps, sans contredire les règles de fiabilité) :\n" +
       choisis.map((t) => "- " + t.label + " : " + t.consigne).join("\n");
-    if (options.tons.includes("Optimiste") && options.tons.includes("Pessimiste")) {
-      txt += "\nOptimiste et pessimiste se contredisent : équilibre-les en présentant les points positifs et les points de vigilance.";
-    }
     parts.push(txt);
   }
   const one = (list, val, titre) => {
@@ -743,8 +833,8 @@ function setBusy(busy) {
   els.send.textContent = busy ? "■" : "➤";
   els.send.title = busy ? "Arrêter" : "Envoyer";
   els.send.classList.toggle("stop", busy);
-  document.querySelectorAll(".action, .chip").forEach((b) => (b.disabled = busy));
-  if (!busy) controller = null;
+  document.querySelectorAll(".action, .chip, .nav-btn").forEach((b) => (b.disabled = busy));
+  if (!busy) { controller = null; renderOptions(); renderFavorites(); updateNav(); }
 }
 
 function updateBadge() {
@@ -793,15 +883,12 @@ function openSettings() {
   els.rules.value = settings.rules || "";
   els.protectedTerms.value = settings.protectedTerms || "";
   els.testResult.hidden = true;
-  els.historyPanel.hidden = true;
   showProviderFields();
-  els.settings.hidden = false;
-  els.main.hidden = true;
+  showPanel(els.settings);
 }
 
 function closeSettings() {
-  els.settings.hidden = true;
-  els.main.hidden = !els.historyPanel.hidden;
+  closePanels();
 }
 
 function saveSettings() {
@@ -853,17 +940,27 @@ async function downloadManifest() {
 --------------------------------------------------------------------- */
 function loadOptions() {
   const d = { tons: [], forme: "", longueur: "", destinataire: "" };
-  try { return Object.assign(d, JSON.parse(localStorage.getItem(OPTIONS_KEY) || "{}")); } catch (_) { return d; }
+  try { return sanitizeOptions(Object.assign(d, JSON.parse(localStorage.getItem(OPTIONS_KEY) || "{}"))); } catch (_) { return d; }
+}
+
+// Retire les tons contraires (garde le premier coché)
+function sanitizeOptions(o) {
+  const kept = [];
+  (o.tons || []).forEach((t) => {
+    if (TONS.some((x) => x.label === t) && !kept.some((k) => tonsIncompatibles(k).has(t))) kept.push(t);
+  });
+  return { tons: kept, forme: o.forme || "", longueur: o.longueur || "", destinataire: o.destinataire || "" };
 }
 function saveOptions() {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
 }
 
-function chip(label, on, title, onClick) {
+function chip(label, on, title, onClick, disabled) {
   const b = document.createElement("button");
   b.className = "chip" + (on ? " on" : "");
   b.textContent = (on ? "✓ " : "") + label;
   b.title = title;
+  b.disabled = !!disabled;
   b.setAttribute("aria-pressed", on);
   b.addEventListener("click", onClick);
   return b;
@@ -874,10 +971,12 @@ function renderOptions() {
   els.tons.innerHTML = "";
   TONS.forEach((t) => {
     const on = options.tons.includes(t.label);
-    els.tons.appendChild(chip(t.label, on, t.consigne, () => {
+    const bloquant = options.tons.find((x) => tonsIncompatibles(x).has(t.label));
+    const titre = bloquant ? "Incompatible avec « " + bloquant + " »" : t.consigne;
+    els.tons.appendChild(chip(t.label, on, titre, () => {
       options.tons = on ? options.tons.filter((x) => x !== t.label) : options.tons.concat(t.label);
       saveOptions(); renderOptions();
-    }));
+    }, !!bloquant || !!controller));
   });
   // Forme, longueur, destinataire : un seul choix
   [["forme", FORMES, els.forme], ["longueur", LONGUEURS, els.longueur], ["destinataire", DESTINATAIRES, els.destinataire]]
@@ -888,7 +987,7 @@ function renderOptions() {
         box.appendChild(chip(o.label, on, o.consigne, () => {
           options[key] = on ? "" : o.label;
           saveOptions(); renderOptions();
-        }));
+        }, !!controller));
       });
     });
   const r = optionsResume();
@@ -906,20 +1005,13 @@ function loadHistory() {
 function saveToHistory(label, answer, mode, source) {
   if (/^(phrase|texte) correct/i.test(answer)) return;
   const list = loadHistory();
-  list.unshift({ date: new Date().toISOString(), label, answer, mode, source: (source || "").slice(0, 1500) });
+  list.unshift({ date: new Date().toISOString(), label, answer, mode, source: (source || "").slice(0, 6000) });
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX))); } catch (_) {}
 }
 
 function openHistory() {
-  closeSettings();
   renderHistory();
-  els.historyPanel.hidden = false;
-  els.main.hidden = true;
-}
-
-function closeHistory() {
-  els.historyPanel.hidden = true;
-  els.main.hidden = false;
+  showPanel(els.historyPanel);
 }
 
 function renderHistory() {
@@ -948,6 +1040,349 @@ function renderHistory() {
     });
     els.historyList.appendChild(item);
   });
+}
+
+/* ---------------------------------------------------------------------
+   NAVIGATION ← → : texte de départ et résultat, toujours ensemble
+--------------------------------------------------------------------- */
+function updateNav() {
+  const list = loadHistory();
+  els.navBar.hidden = !list.length;
+  if (browseIndex >= list.length) browseIndex = list.length - 1;
+  $("nav-prev").disabled = !!controller || browseIndex >= list.length - 1;
+  $("nav-next").disabled = !!controller || browseIndex < 0;
+  els.navPos.textContent = browseIndex < 0
+    ? "Résultats précédents (" + list.length + ")"
+    : "Résultat " + (list.length - browseIndex) + " / " + list.length;
+}
+
+// +1 = plus ancien, -1 = plus récent
+function navigate(step) {
+  const list = loadHistory();
+  const next = browseIndex + step;
+  if (next < 0) return exitBrowse();
+  if (next >= list.length) return;
+  browseIndex = next;
+  showBrowse(list[browseIndex]);
+  updateNav();
+}
+
+function exitBrowse() {
+  browseIndex = -1;
+  els.browse.hidden = true;
+  els.chat.hidden = false;
+  updateNav();
+}
+
+function showBrowse(h) {
+  els.chat.hidden = true;
+  els.browse.hidden = false;
+  els.browse.innerHTML = "";
+  const d = new Date(h.date);
+  const head = document.createElement("div");
+  head.className = "hist-head";
+  head.textContent = h.label + " — " + d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  const src = document.createElement("div");
+  src.className = "msg source-view";
+  const st = document.createElement("div");
+  st.className = "version-title";
+  st.textContent = "Texte de départ";
+  const sb = document.createElement("div");
+  sb.className = "body";
+  sb.textContent = h.source || "(non enregistré)";
+  const sbar = document.createElement("div");
+  sbar.className = "msg-tools";
+  const cp = document.createElement("button");
+  cp.className = "tool";
+  cp.textContent = "Copier";
+  cp.addEventListener("click", async () => { await copyText(h.source || ""); toast("Texte de départ copié ✓"); });
+  sbar.appendChild(cp);
+  src.append(st, sb, sbar);
+
+  const res = document.createElement("div");
+  res.className = "msg assistant";
+  const rt = document.createElement("div");
+  rt.className = "version-title";
+  rt.textContent = "Résultat";
+  const rb = document.createElement("div");
+  rb.className = "body";
+  rb.textContent = h.answer;
+  res.append(rt, rb);
+  if (h.source) {
+    const wc = document.createElement("div");
+    wc.className = "wc";
+    wc.textContent = "Mots : " + countWords(h.source) + " → " + countWords(h.answer);
+    res.appendChild(wc);
+  }
+  addTools({ root: res, body: rb }, h.answer, h.mode === "explication" ? "explication" : "texte");
+  els.browse.append(head, src, res);
+}
+
+/* ---------------------------------------------------------------------
+   FAVORIS : sauvegarde de l'action + des réglages du texte
+--------------------------------------------------------------------- */
+function loadFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch (_) { return []; }
+}
+function storeFavorites(list) {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(list)); } catch (_) {}
+}
+
+function saveFavorite() {
+  const name = els.favName.value.trim();
+  if (!name) { toast("Donnez un nom au favori."); return; }
+  const list = loadFavorites().filter((f) => f.name !== name);
+  list.push({ name, action: selectedAction ? selectedAction.label : "", options: JSON.parse(JSON.stringify(options)) });
+  storeFavorites(list);
+  els.favForm.hidden = true;
+  renderFavorites();
+  toast("Favori « " + name + " » enregistré ✓");
+}
+
+function applyFavorite(f) {
+  options = sanitizeOptions(f.options || {});
+  saveOptions();
+  renderOptions();
+  selectAction(ACTIONS.find((a) => a.label === f.action) || null);
+  toast("Favori « " + f.name + " » activé — appuyez sur ➤");
+}
+
+function renderFavorites() {
+  const list = loadFavorites();
+  els.favList.innerHTML = "";
+  if (!list.length) {
+    els.favList.innerHTML = '<span class="muted">Aucun favori. Choisissez une action et des réglages, puis « Enregistrer ».</span>';
+    return;
+  }
+  list.forEach((f) => {
+    const wrap = document.createElement("span");
+    wrap.className = "fav";
+    const details = [f.action].concat(sanitizeOptions(f.options || {}).tons, [(f.options || {}).forme, (f.options || {}).longueur, (f.options || {}).destinataire]).filter(Boolean).join(", ");
+    const b = chip("★ " + f.name, false, details || "Réglages vides", () => applyFavorite(f), !!controller);
+    const del = document.createElement("button");
+    del.className = "fav-del";
+    del.textContent = "✕";
+    del.title = "Supprimer ce favori";
+    del.addEventListener("click", () => { storeFavorites(loadFavorites().filter((x) => x.name !== f.name)); renderFavorites(); });
+    wrap.append(b, del);
+    els.favList.appendChild(wrap);
+  });
+}
+
+/* ---------------------------------------------------------------------
+   EXPORT / IMPORT des réglages (sans la clé API)
+--------------------------------------------------------------------- */
+async function exportSettings() {
+  const data = {
+    app: "assistant-ia-word", version: 1,
+    settings: Object.assign({}, settings, { apiKey: "" }),
+    options, favoris: loadFavorites(),
+  };
+  const json = JSON.stringify(data, null, 2);
+  try {
+    const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "assistant-ia-reglages.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (_) {}
+  await copyText(json);
+  toast("Réglages exportés (fichier téléchargé et copié) ✓");
+}
+
+async function importSettings(e) {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== "assistant-ia-word") throw new Error("ce fichier ne vient pas de l'Assistant IA");
+    const keepKey = settings.apiKey;
+    settings = Object.assign({}, DEFAULTS, data.settings || {}, { apiKey: keepKey, saved: true });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch (_) {}
+    if (data.options) { options = sanitizeOptions(data.options); saveOptions(); }
+    if (Array.isArray(data.favoris)) storeFavorites(data.favoris);
+    renderOptions(); renderFavorites(); updateBadge(); openSettings();
+    toast("Réglages importés ✓");
+  } catch (err) {
+    toast("Import impossible : " + err.message);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   DOCUMENTS DE RÉFÉRENCE : extraction du texte et recherche des passages
+--------------------------------------------------------------------- */
+function loadDocs() {
+  try { return JSON.parse(localStorage.getItem(DOCS_KEY) || "[]"); } catch (_) { return []; }
+}
+function saveDocs() {
+  try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); }
+  catch (_) { toast("Documents trop volumineux pour être gardés après fermeture : ils restent disponibles pour cette séance."); }
+  updateDocsBadge();
+}
+
+function updateDocsBadge() {
+  const actifs = docs.filter((d) => d.use).length;
+  els.docsCount.hidden = !docs.length;
+  els.docsCount.textContent = actifs;
+  els.useDocsWrap.hidden = !actifs;
+  els.useDocsWrap.lastChild.textContent = " 📄 Documents (" + actifs + ")";
+}
+
+function loadScript(url) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[src="' + url + '"]')) return resolve();
+    const sc = document.createElement("script");
+    sc.src = url;
+    sc.onload = resolve;
+    sc.onerror = () => reject(new Error("bibliothèque de lecture introuvable (connexion internet ?)"));
+    document.head.appendChild(sc);
+  });
+}
+
+// Découpe un texte en morceaux d'environ 1 200 caractères, sans couper les paragraphes si possible
+function chunkText(text, label) {
+  const paras = text.split(/\n\s*\n|\n/).map((p) => p.trim()).filter(Boolean);
+  const out = [];
+  let cur = "";
+  const push = () => { if (cur.trim()) out.push({ label, text: cur.trim() }); cur = ""; };
+  paras.forEach((p) => {
+    if (cur.length + p.length > 1200) push();
+    if (p.length > 1600) { for (let i = 0; i < p.length; i += 1200) out.push({ label, text: p.slice(i, i + 1200) }); }
+    else cur += p + "\n";
+  });
+  push();
+  return out;
+}
+
+async function extractDocument(file) {
+  const name = file.name;
+  const ext = name.split(".").pop().toLowerCase();
+  if (ext === "txt" || ext === "md") {
+    return chunkText(await file.text(), "");
+  }
+  if (ext === "docx") {
+    await loadScript(LIBS.docx);
+    const r = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    const chunks = chunkText(r.value, "");
+    chunks.forEach((c, i) => (c.label = "partie " + (i + 1)));
+    return chunks;
+  }
+  if (ext === "pdf") {
+    await loadScript(LIBS.pdf);
+    const pdfjs = window.pdfjsLib;
+    pdfjs.GlobalWorkerOptions.workerSrc = LIBS.pdfWorker;
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const chunks = [];
+    for (let n = 1; n <= pdf.numPages; n++) {
+      els.docsStatus.textContent = "Lecture de « " + name + " » : page " + n + " / " + pdf.numPages + "…";
+      const page = await pdf.getPage(n);
+      const content = await page.getTextContent();
+      let txt = "";
+      content.items.forEach((it) => { txt += it.str + (it.hasEOL ? "\n" : " "); });
+      chunkText(txt, "p. " + n).forEach((c) => chunks.push(c));
+    }
+    if (chunks.reduce((s, c) => s + c.text.length, 0) < pdf.numPages * 30) {
+      throw new Error("ce PDF semble scanné (image sans texte lisible)");
+    }
+    return chunks;
+  }
+  throw new Error("format non pris en charge (PDF, .docx, .txt ou .md uniquement)");
+}
+
+async function addDocuments(files) {
+  for (const file of files) {
+    els.docsStatus.textContent = "Lecture de « " + file.name + " »…";
+    try {
+      const chunks = await extractDocument(file);
+      if (!chunks.length) throw new Error("aucun texte trouvé");
+      docs = docs.filter((d) => d.name !== file.name);
+      docs.push({ name: file.name, chunks, chars: chunks.reduce((s, c) => s + c.text.length, 0), use: true });
+      saveDocs();
+      els.docsStatus.textContent = "✓ « " + file.name + " » ajouté.";
+    } catch (e) {
+      els.docsStatus.textContent = "✗ « " + file.name + " » : " + e.message + ".";
+    }
+    renderDocs();
+  }
+}
+
+function renderDocs() {
+  els.docsList.innerHTML = "";
+  if (!docs.length) {
+    els.docsList.innerHTML = '<p class="hint">Aucun document pour l\'instant.</p>';
+    return;
+  }
+  docs.forEach((d) => {
+    const item = document.createElement("div");
+    item.className = "hist-item doc-item";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = d.use;
+    cb.title = "Utiliser ce document";
+    cb.addEventListener("change", () => { d.use = cb.checked; saveDocs(); });
+    const info = document.createElement("div");
+    info.className = "doc-info";
+    const pages = d.chunks.filter((c) => /^p\. /.test(c.label)).map((c) => c.label);
+    info.innerHTML = "";
+    const n = document.createElement("div"); n.className = "doc-name"; n.textContent = d.name;
+    const m = document.createElement("div"); m.className = "muted";
+    m.textContent = Math.round(d.chars / 1000) + " k caractères" + (pages.length ? " · " + new Set(pages).size + " pages" : "");
+    info.append(n, m);
+    const del = document.createElement("button");
+    del.className = "fav-del";
+    del.textContent = "✕";
+    del.title = "Retirer";
+    del.addEventListener("click", () => { docs = docs.filter((x) => x !== d); saveDocs(); renderDocs(); });
+    item.append(cb, info, del);
+    els.docsList.appendChild(item);
+  });
+}
+
+const MOTS_VIDES = new Set("les des une pour par sur dans avec aux est sont qui que quoi dont ces cette son ses leur leurs pas plus mais ont été être fait faire tout tous toute toutes comme elle ils nous vous lui entre selon sans sous vers chez donc ainsi alors aussi bien quel quelle quels quelles".split(" "));
+function motsCles(t) {
+  return [...new Set(t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !MOTS_VIDES.has(w)))];
+}
+
+// Choisit les passages les plus utiles pour la question, dans la limite de la mémoire du modèle
+function docsContext(query) {
+  if (!els.useDocs.checked) return null;
+  const actifs = docs.filter((d) => d.use);
+  if (!actifs.length) return null;
+  const budget = settings.provider === "claude" ? 60000 : 6000;
+  const all = [];
+  actifs.forEach((d) => d.chunks.forEach((c) => all.push({ doc: d.name, label: c.label, text: c.text, norm: c.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") })));
+  const keys = motsCles(query);
+  const df = {};
+  keys.forEach((k) => (df[k] = all.filter((c) => c.norm.includes(k)).length));
+  all.forEach((c) => {
+    c.score = 0;
+    keys.forEach((k) => {
+      if (!df[k]) return;
+      const occ = c.norm.split(k).length - 1;
+      if (occ) c.score += (1 + Math.log(occ)) * Math.log(1 + all.length / df[k]);
+    });
+  });
+  const total = all.reduce((s, c) => s + c.text.length, 0);
+  let chosen;
+  if (total <= budget) chosen = all;                       // tout tient : on envoie tout
+  else {
+    chosen = [];
+    let used = 0;
+    all.filter((c) => c.score > 0).sort((a, b) => b.score - a.score).forEach((c) => {
+      if (used + c.text.length <= budget) { chosen.push(c); used += c.text.length; }
+    });
+    if (!chosen.length) return null;
+  }
+  const ref = (c) => "[" + c.doc + (c.label ? ", " + c.label : "") + "]";
+  const text = "Documents de référence (extraits) :\n\n" +
+    chosen.map((c) => ref(c) + "\n" + c.text).join("\n\n") +
+    "\n\nAppuie-toi sur ces extraits quand c'est utile et cite la source entre crochets, par exemple " + ref(chosen[0]) +
+    ". Si l'information demandée n'y figure pas, dis-le clairement au lieu d'inventer.\n\n---\n\n";
+  const nDocs = new Set(chosen.map((c) => c.doc)).size;
+  return { text, label: nDocs + " document" + (nDocs > 1 ? "s" : "") + " · " + chosen.length + " extrait" + (chosen.length > 1 ? "s" : "") };
 }
 
 /* ---------------------------------------------------------------------
