@@ -251,6 +251,37 @@ button:disabled { opacity: .5; cursor: default; }
 .doc-item .fav-del { border-radius: 6px; }
 .row.tight { margin-top: 6px; }
 
+/* ---------- Onglets ---------- */
+.tabs { display: flex; background: var(--accent); padding: 0 8px; gap: 2px; }
+.tab { flex: 1; border: 0; background: rgba(255,255,255,.12); color: #e6eefb; padding: 7px 6px; font-size: 12.5px;
+  font-weight: 600; border-radius: 6px 6px 0 0; }
+.tab:hover { background: rgba(255,255,255,.22); }
+.tab.on { background: var(--bg); color: var(--accent-dark); }
+
+/* ---------- Navigation : actuel (blanc) / ancien (gris clair) ---------- */
+.state-tag { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  padding: 1px 7px; border-radius: 9px; margin-right: 4px; vertical-align: 1px; }
+.browse.current .state-tag { background: var(--accent); color: #fff; }
+.browse.old .state-tag { background: #8a919c; color: #fff; }
+.browse .msg { min-height: 0; }
+.browse .msg .body { overflow-y: auto; }
+.browse .source-view .body { height: 96px; }
+.browse .assistant .body { height: 170px; }
+.browse.current .msg.source-view { background: #fff; border-style: solid; border-color: var(--border); }
+.browse.current .msg.assistant { background: #fff; }
+.browse.old .msg.source-view, .browse.old .msg.assistant { background: #f1f2f4; border: 1px solid #e0e3e7; }
+.browse.old .hist-head { color: #8a919c; }
+.nav-bar.old { background: #f1f2f4; }
+.src-btns { display: inline-flex; gap: 12px; }
+
+/* ---------- Chat documents ---------- */
+.chat-docs { display: flex; flex-direction: column; gap: 4px; }
+.chat-doc { display: flex; align-items: center; gap: 7px; font-size: 12.5px; cursor: pointer; padding: 3px 0; }
+.chat-doc .doc-name { flex: 1; font-weight: 500; }
+.msg.note { align-self: center; background: transparent; color: var(--muted); font-size: 11.5px; padding: 2px 6px; }
+#dchat .msg.user { white-space: pre-wrap; }
+#export-text { margin-top: 10px; font-family: Consolas, monospace; font-size: 11.5px; }
+
 /* ---------- Corrections ---------- */
 .msg.assistant del { background: #fde2e1; color: #a1251b; text-decoration: line-through; border-radius: 3px; padding: 0 1px; }
 .msg.assistant ins { background: #dcf3e3; color: #1a6b35; text-decoration: none; border-radius: 3px; padding: 0 1px; font-weight: 600; }

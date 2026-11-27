@@ -19,6 +19,11 @@
     </div>
   </header>
 
+  <nav class="tabs">
+    <button id="tab-redac" class="tab on">✍ Rédaction</button>
+    <button id="tab-chat" class="tab">💬 Chat documents</button>
+  </nav>
+
   <!-- PARAMÈTRES -->
   <section id="settings" class="settings" hidden>
     <h2>Paramètres</h2>
@@ -70,7 +75,7 @@
     <p class="hint">Appliquées à chaque demande.</p>
 
     <label>Termes à ne jamais modifier (un par ligne)
-      <textarea id="set-protected" rows="4" placeholder="RN568&#10;Port-de-Bouc&#10;GNT 0/31.5"></textarea>
+      <textarea id="set-protected" rows="4" placeholder="GNT 0/31.5&#10;BBSG 0/10&#10;Bordures T2&#10;Fascicule 70"></textarea>
     </label>
     <p class="hint">Noms de lieux, références, codes… L'IA doit les recopier tels quels. Un avertissement s'affiche si l'un d'eux disparaît.</p>
 
@@ -79,12 +84,28 @@
     <div class="row tight">
       <button id="btn-export" class="ghost">⬇ Exporter</button>
       <button id="btn-import" class="ghost">⬆ Importer</button>
+      <button id="btn-export-prompt" class="ghost">📝 Exporter en prompt</button>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
     </div>
 
     <div class="row">
       <button id="btn-save" class="primary">Enregistrer</button>
       <button id="btn-cancel" class="ghost">Fermer</button>
+    </div>
+  </section>
+
+  <!-- EXPORT EN PROMPT -->
+  <section id="prompt-panel" class="settings" hidden>
+    <h2>Exporter en prompt</h2>
+    <p class="hint">Un texte clair à coller au début d'une conversation dans Claude, ChatGPT ou le chat de LM Studio, pour retrouver le comportement de l'outil sans le panneau.</p>
+    <label>Réglages à inclure
+      <select id="export-source"></select>
+    </label>
+    <textarea id="export-text" rows="16" readonly></textarea>
+    <div class="row">
+      <button id="btn-export-copy" class="primary">Copier</button>
+      <button id="btn-export-dl" class="ghost">⬇ Télécharger</button>
+      <button id="btn-export-close" class="ghost">Fermer</button>
     </div>
   </section>
 
@@ -147,6 +168,9 @@
       </div>
       <div id="tons" class="chips"></div>
 
+      <div class="section-head"><span class="section-title small">Domaine d'activité</span><span class="muted">plusieurs choix</span></div>
+      <div id="opt-domaines" class="chips"></div>
+
       <div class="section-head"><span class="section-title small">Forme</span></div>
       <div id="opt-forme" class="chips"></div>
 
@@ -172,7 +196,10 @@
         <label class="switch" id="follow-wrap" title="Activé : la sélection Word est reprise automatiquement. Désactivé : le texte reste figé.">
           <input type="checkbox" id="follow-sel" checked><span class="slider"></span> Suivre la sélection Word
         </label>
-        <button id="btn-copy-source" class="link-btn">Copier</button>
+        <span class="src-btns">
+          <button id="btn-paste-source" class="link-btn">Coller</button>
+          <button id="btn-copy-source" class="link-btn">Copier</button>
+        </span>
       </div>
       <div id="selection-preview" class="preview empty">Sélectionnez du texte dans Word…</div>
       <textarea id="manual-text" rows="4" placeholder="Collez votre texte ici" hidden></textarea>
@@ -188,8 +215,29 @@
     <section id="chat" class="chat"></section>
   </main>
 
+  <!-- ONGLET CHAT DOCUMENTS -->
+  <main id="chat-main" class="main" hidden>
+    <section class="card">
+      <div class="source-head">
+        <span class="source-title">Documents joints</span>
+        <button id="btn-chat-add-docs" class="link-btn">+ Ajouter</button>
+      </div>
+      <div id="chat-docs" class="chat-docs"></div>
+    </section>
+    <section id="dchat" class="chat"></section>
+  </main>
+
+  <footer id="composer-chat" class="composer-wrap" hidden>
+    <div class="composer-bar"><span class="muted">Posez vos questions sur les documents cochés.</span>
+      <button id="btn-chat-new" class="link-btn">↺ Nouvelle discussion</button></div>
+    <div class="composer">
+      <textarea id="dprompt" rows="2" placeholder="Une question sur les documents…"></textarea>
+      <button id="btn-dsend" class="primary send" title="Envoyer">➤</button>
+    </div>
+  </footer>
+
   <!-- SAISIE ET LANCEMENT -->
-  <footer class="composer-wrap">
+  <footer id="composer-redac" class="composer-wrap">
     <div class="composer-bar">
       <span id="sel-pill" class="sel-pill" hidden></span>
       <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents de référence">

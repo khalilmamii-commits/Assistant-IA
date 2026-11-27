@@ -61,6 +61,8 @@ const TONS = [
   { label: "Persuasif",    consigne: "argumente pour convaincre un maître d'ouvrage ou un jury" },
   { label: "Synthétique",  consigne: "va à l'essentiel, phrases courtes" },
   { label: "Pédagogique",  consigne: "explique simplement, définit les termes techniques" },
+  { label: "Précis",       consigne: "vocabulaire exact, chiffres et références conservés, aucune formulation vague" },
+  { label: "Technique",    consigne: "vocabulaire du métier, explication détaillée des solutions et des choix techniques" },
 ];
 
 /* Tons contraires : quand l'un est coché, les autres sont grisés */
@@ -68,6 +70,7 @@ const TONS_EXCLUSIFS = [
   ["Formel", "Informel", "Familier"],
   ["Optimiste", "Pessimiste"],
   ["Synthétique", "Pédagogique"],
+  ["Technique", "Familier"],
   ["Neutre", "Optimiste"], ["Neutre", "Pessimiste"], ["Neutre", "Persuasif"],
 ];
 function tonsIncompatibles(label) {
@@ -75,6 +78,20 @@ function tonsIncompatibles(label) {
   TONS_EXCLUSIFS.forEach((g) => { if (g.includes(label)) g.forEach((x) => x !== label && out.add(x)); });
   return out;
 }
+
+/* Domaines d'activité (plusieurs choix) */
+const DOMAINES = [
+  { label: "VRD",                consigne: "voiries et réseaux divers, terrassements, réseaux humides et secs" },
+  { label: "Route",              consigne: "chaussées, structures, couches de roulement, géométrie routière, entretien" },
+  { label: "Aménagement urbain", consigne: "espaces publics, cheminements, accessibilité PMR, paysage, mobilier urbain" },
+  { label: "Assainissement",     consigne: "eaux usées et pluviales, réseaux, branchements, ouvrages de rétention" },
+  { label: "Ouvrage d'art",      consigne: "ponts, murs de soutènement, structures béton et métal, inspection" },
+  { label: "Environnement",      consigne: "impacts, milieux naturels, nuisances, déchets, réglementation environnementale" },
+  { label: "Hydraulique",        consigne: "écoulements, bassins versants, débits, dimensionnement d'ouvrages hydrauliques" },
+  { label: "Trafic",             consigne: "comptages, capacité, carrefours, études de circulation" },
+  { label: "Réseaux secs",       consigne: "éclairage public, télécommunications, électricité, signalisation lumineuse" },
+  { label: "Travaux",            consigne: "phasage, exploitation sous circulation, sécurité de chantier, délais, suivi d'exécution" },
+];
 
 /* Choix uniques (un seul à la fois, cliquer à nouveau pour désélectionner) */
 const FORMES = [
@@ -139,6 +156,12 @@ let selectedAction = null;       // action choisie, lancée par le bouton bleu
 let frozenSource = null;         // texte figé quand « Suivre la sélection » est désactivé
 let browseIndex = -1;            // -1 = conversation en cours ; sinon position dans l'historique
 let docs = loadDocs();           // documents de référence
+let pastedSource = false;        // texte ciblé collé à la main dans Word
+let currentTab = "redac";
+// Onglet Chat documents : sa propre conversation, totalement séparée de la Rédaction
+let chatHistory = [];
+let chatSummary = "";
+let chatPool = [];               // extraits déjà envoyés, gardés dans le même ordre
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -154,6 +177,9 @@ const els = {
   docsCount: $("docs-count"), useDocs: $("use-docs"), useDocsWrap: $("use-docs-wrap"),
   favList: $("fav-list"), favForm: $("fav-form"), favName: $("fav-name"),
   follow: $("follow-sel"), navBar: $("nav-bar"), navPos: $("nav-pos"), browse: $("browse"),
+  domaines: $("opt-domaines"), promptPanel: $("prompt-panel"), exportSource: $("export-source"), exportText: $("export-text"),
+  chatMain: $("chat-main"), chatDocs: $("chat-docs"), dchat: $("dchat"), dprompt: $("dprompt"), dsend: $("btn-dsend"),
+  composerRedac: $("composer-redac"), composerChat: $("composer-chat"),
   provider: $("set-provider"), cfgLms: $("cfg-lmstudio"), cfgClaude: $("cfg-claude"),
   lmsUrl: $("set-lms-url"), lmsModel: $("set-lms-model"), testResult: $("test-result"),
   key: $("set-key"), model: $("set-model"), context: $("set-context"),
@@ -178,7 +204,7 @@ function start(inWord) {
   });
   renderOptions();
   $("btn-options-clear").addEventListener("click", () => {
-    options = { tons: [], forme: "", longueur: "", destinataire: "" };
+    options = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "" };
     saveOptions(); renderOptions();
   });
   els.selPill.addEventListener("click", () => selectAction(null));
@@ -205,8 +231,23 @@ function start(inWord) {
   });
   els.follow.addEventListener("change", async () => {
     frozenSource = null;
+    if (els.follow.checked && pastedSource) { pastedSource = false; els.manual.hidden = true; els.preview.hidden = false; }
     if (!els.follow.checked) frozenSource = await readWord();
     refreshPreview();
+  });
+  $("btn-paste-source").addEventListener("click", pasteSource);
+  $("btn-export-prompt").addEventListener("click", openExportPrompt);
+  els.exportSource.addEventListener("change", buildExportPrompt);
+  $("btn-export-copy").addEventListener("click", async () => { await copyText(els.exportText.value); toast("Prompt copié ✓"); });
+  $("btn-export-dl").addEventListener("click", () => downloadText(els.exportText.value, "prompt-assistant-ia.txt"));
+  $("btn-export-close").addEventListener("click", openSettings);
+  $("tab-redac").addEventListener("click", () => switchTab("redac"));
+  $("tab-chat").addEventListener("click", () => switchTab("chat"));
+  $("btn-chat-add-docs").addEventListener("click", () => { renderDocs(); showPanel(els.docsPanel); });
+  $("btn-chat-new").addEventListener("click", newChat);
+  els.dsend.addEventListener("click", () => (controller ? stopGeneration() : chatSend()));
+  els.dprompt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (!controller) chatSend(); }
   });
   $("nav-prev").addEventListener("click", () => navigate(+1));
   $("nav-next").addEventListener("click", () => navigate(-1));
@@ -254,12 +295,25 @@ function start(inWord) {
 
 /* Un seul panneau (paramètres, historique, documents) affiché à la fois */
 function showPanel(panel) {
-  [els.settings, els.historyPanel, els.docsPanel].forEach((p) => (p.hidden = p !== panel));
+  [els.settings, els.historyPanel, els.docsPanel, els.promptPanel].forEach((p) => (p.hidden = p !== panel));
   els.main.hidden = true;
+  els.chatMain.hidden = true;
 }
 function closePanels() {
-  [els.settings, els.historyPanel, els.docsPanel].forEach((p) => (p.hidden = true));
-  els.main.hidden = false;
+  [els.settings, els.historyPanel, els.docsPanel, els.promptPanel].forEach((p) => (p.hidden = true));
+  els.main.hidden = currentTab !== "redac";
+  els.chatMain.hidden = currentTab !== "chat";
+  if (currentTab === "chat") renderChatDocs();
+}
+
+/* Onglets Rédaction / Chat documents */
+function switchTab(tab) {
+  currentTab = tab;
+  $("tab-redac").classList.toggle("on", tab === "redac");
+  $("tab-chat").classList.toggle("on", tab === "chat");
+  els.composerRedac.hidden = tab !== "redac";
+  els.composerChat.hidden = tab !== "chat";
+  closePanels();
 }
 
 if (typeof Office !== "undefined" && Office.onReady) {
@@ -273,9 +327,29 @@ if (typeof Office !== "undefined" && Office.onReady) {
    5. LECTURE DU DOCUMENT WORD
 --------------------------------------------------------------------- */
 async function getSourceText() {
-  if (!IN_WORD) return els.manual.value.trim();
+  if (!IN_WORD || pastedSource) return els.manual.value.trim();
   if (!els.wholeDoc.checked && !els.follow.checked && frozenSource !== null) return frozenSource;
   return readWord();
+}
+
+// Bouton « Coller » : met le contenu du presse-papiers dans le texte ciblé
+async function pasteSource() {
+  let txt = null;
+  try { txt = await navigator.clipboard.readText(); } catch (_) {}
+  if (IN_WORD) {
+    // Le texte collé remplace la sélection Word : on arrête de suivre la sélection
+    pastedSource = true;
+    els.follow.checked = false;
+    els.preview.hidden = true;
+    els.manual.hidden = false;
+  }
+  if (txt) {
+    els.manual.value = txt;
+    toast("Texte collé ✓");
+  } else {
+    els.manual.focus();
+    toast("Collez votre texte avec Ctrl + V");
+  }
 }
 
 async function readWord() {
@@ -413,7 +487,7 @@ async function safeGetSource() {
   }
 }
 
-function newConversation() {
+function newConversation() { // Rédaction uniquement : la discussion du Chat documents n'est pas touchée
   stopGeneration();
   if (browseIndex >= 0) exitBrowse();
   history = [];
@@ -550,6 +624,11 @@ function optionsConsigne() {
       choisis.map((t) => "- " + t.label + " : " + t.consigne).join("\n");
     parts.push(txt);
   }
+  if (options.domaines.length) {
+    const choisis = DOMAINES.filter((d) => options.domaines.includes(d.label));
+    parts.push("Domaine(s) d'activité : utilise le vocabulaire, les préoccupations et les tournures propres à " +
+      choisis.map((d) => d.label + " (" + d.consigne + ")").join(" ; ") + ".");
+  }
   const one = (list, val, titre) => {
     const o = list.find((x) => x.label === val);
     if (o) parts.push(titre + " : " + o.consigne + ".");
@@ -561,7 +640,7 @@ function optionsConsigne() {
 }
 
 function optionsResume() {
-  return options.tons.concat([options.forme, options.longueur, options.destinataire].filter(Boolean)).join(", ");
+  return options.tons.concat(options.domaines, [options.forme, options.longueur, options.destinataire].filter(Boolean)).join(", ");
 }
 
 /* ---------------------------------------------------------------------
@@ -605,7 +684,7 @@ async function listLMStudioModels(base) {
   return (data.data || []).map((m) => m.id).filter((id) => !/embed/i.test(id));
 }
 
-async function callLMStudio(messages, onText, signal, temperature) {
+async function callLMStudio(messages, onText, signal, temperature, system) {
   const base = lmsBase();
   let model = settings.lmsModel;
   if (!model) {
@@ -625,7 +704,7 @@ async function callLMStudio(messages, onText, signal, temperature) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         model,
-        messages: [{ role: "system", content: systemPrompt() }].concat(messages.slice(-20)),
+        messages: [{ role: "system", content: system || systemPrompt() }].concat(messages.slice(-20)),
         temperature: temperature || 0.4,
         stream: true,
       }),
@@ -686,7 +765,7 @@ async function testLMStudio() {
 /* ---------------------------------------------------------------------
    10. MOTEUR CLAUDE (API Anthropic)
 --------------------------------------------------------------------- */
-async function callClaude(messages, onText, signal) { // (la variété vient du modèle)
+async function callClaude(messages, onText, signal, temperature, system) { // (la variété vient du modèle)
   let res;
   try {
     res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -701,7 +780,7 @@ async function callClaude(messages, onText, signal) { // (la variété vient du 
       body: JSON.stringify({
         model: settings.model || DEFAULTS.model,
         max_tokens: MAX_TOKENS_CLAUDE,
-        system: systemPrompt(),
+        system: system || systemPrompt(),
         messages: messages.slice(-20),
         stream: true,
       }),
@@ -808,7 +887,10 @@ function addTools(bubble, text, mode) {
     bar.appendChild(b);
   };
   if (IN_WORD) {
-    if (mode === "explication") {
+    if (mode === "chat") {
+      add("Insérer dans Word", async () => { await wordInsertAfter(text); toast("Texte inséré ✓"); }, true);
+      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté ✓"); });
+    } else if (mode === "explication") {
       add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté ✓"); }, true);
       add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré ✓"); });
     } else {
@@ -830,9 +912,11 @@ function showError(message) {
 }
 
 function setBusy(busy) {
-  els.send.textContent = busy ? "■" : "➤";
-  els.send.title = busy ? "Arrêter" : "Envoyer";
-  els.send.classList.toggle("stop", busy);
+  [els.send, els.dsend].forEach((b) => {
+    b.textContent = busy ? "■" : "➤";
+    b.title = busy ? "Arrêter" : "Envoyer";
+    b.classList.toggle("stop", busy);
+  });
   document.querySelectorAll(".action, .chip, .nav-btn").forEach((b) => (b.disabled = busy));
   if (!busy) { controller = null; renderOptions(); renderFavorites(); updateNav(); }
 }
@@ -939,7 +1023,7 @@ async function downloadManifest() {
    TONS : affichage et mémorisation
 --------------------------------------------------------------------- */
 function loadOptions() {
-  const d = { tons: [], forme: "", longueur: "", destinataire: "" };
+  const d = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "" };
   try { return sanitizeOptions(Object.assign(d, JSON.parse(localStorage.getItem(OPTIONS_KEY) || "{}"))); } catch (_) { return d; }
 }
 
@@ -949,7 +1033,8 @@ function sanitizeOptions(o) {
   (o.tons || []).forEach((t) => {
     if (TONS.some((x) => x.label === t) && !kept.some((k) => tonsIncompatibles(k).has(t))) kept.push(t);
   });
-  return { tons: kept, forme: o.forme || "", longueur: o.longueur || "", destinataire: o.destinataire || "" };
+  const domaines = (o.domaines || []).filter((x) => DOMAINES.some((d) => d.label === x));
+  return { tons: kept, domaines, forme: o.forme || "", longueur: o.longueur || "", destinataire: o.destinataire || "" };
 }
 function saveOptions() {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
@@ -977,6 +1062,15 @@ function renderOptions() {
       options.tons = on ? options.tons.filter((x) => x !== t.label) : options.tons.concat(t.label);
       saveOptions(); renderOptions();
     }, !!bloquant || !!controller));
+  });
+  // Domaines : plusieurs choix
+  els.domaines.innerHTML = "";
+  DOMAINES.forEach((d) => {
+    const on = options.domaines.includes(d.label);
+    els.domaines.appendChild(chip(d.label, on, d.consigne, () => {
+      options.domaines = on ? options.domaines.filter((x) => x !== d.label) : options.domaines.concat(d.label);
+      saveOptions(); renderOptions();
+    }, !!controller));
   });
   // Forme, longueur, destinataire : un seul choix
   [["forme", FORMES, els.forme], ["longueur", LONGUEURS, els.longueur], ["destinataire", DESTINATAIRES, els.destinataire]]
@@ -1052,8 +1146,11 @@ function updateNav() {
   $("nav-prev").disabled = !!controller || browseIndex >= list.length - 1;
   $("nav-next").disabled = !!controller || browseIndex < 0;
   els.navPos.textContent = browseIndex < 0
-    ? "Résultats précédents (" + list.length + ")"
-    : "Résultat " + (list.length - browseIndex) + " / " + list.length;
+    ? "Résultats (" + list.length + ") — ← pour parcourir"
+    : browseIndex === 0
+      ? "Résultat actuel · " + list.length + " / " + list.length
+      : "Ancien résultat · " + (list.length - browseIndex) + " / " + list.length;
+  els.navBar.classList.toggle("old", browseIndex > 0);
 }
 
 // +1 = plus ancien, -1 = plus récent
@@ -1063,7 +1160,7 @@ function navigate(step) {
   if (next < 0) return exitBrowse();
   if (next >= list.length) return;
   browseIndex = next;
-  showBrowse(list[browseIndex]);
+  showBrowse(list[browseIndex], browseIndex === 0);
   updateNav();
 }
 
@@ -1074,14 +1171,19 @@ function exitBrowse() {
   updateNav();
 }
 
-function showBrowse(h) {
+function showBrowse(h, isCurrent) {
   els.chat.hidden = true;
   els.browse.hidden = false;
   els.browse.innerHTML = "";
+  els.browse.className = "browse " + (isCurrent ? "current" : "old");
   const d = new Date(h.date);
   const head = document.createElement("div");
   head.className = "hist-head";
-  head.textContent = h.label + " — " + d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  head.innerHTML = "";
+  const tag = document.createElement("span");
+  tag.className = "state-tag";
+  tag.textContent = isCurrent ? "Actuel" : "Ancien";
+  head.append(tag, document.createTextNode(" " + h.label + " — " + d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })));
 
   const src = document.createElement("div");
   src.className = "msg source-view";
@@ -1158,7 +1260,8 @@ function renderFavorites() {
   list.forEach((f) => {
     const wrap = document.createElement("span");
     wrap.className = "fav";
-    const details = [f.action].concat(sanitizeOptions(f.options || {}).tons, [(f.options || {}).forme, (f.options || {}).longueur, (f.options || {}).destinataire]).filter(Boolean).join(", ");
+    const fo = sanitizeOptions(f.options || {});
+    const details = [f.action].concat(fo.tons, fo.domaines, [(f.options || {}).forme, (f.options || {}).longueur, (f.options || {}).destinataire]).filter(Boolean).join(", ");
     const b = chip("★ " + f.name, false, details || "Réglages vides", () => applyFavorite(f), !!controller);
     const del = document.createElement("button");
     del.className = "fav-del";
@@ -1228,6 +1331,7 @@ function updateDocsBadge() {
   els.docsCount.textContent = actifs;
   els.useDocsWrap.hidden = !actifs;
   els.useDocsWrap.lastChild.textContent = " 📄 Documents (" + actifs + ")";
+  if (els.chatDocs && currentTab === "chat") renderChatDocs();
 }
 
 function loadScript(url) {
@@ -1346,14 +1450,15 @@ function motsCles(t) {
     .split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !MOTS_VIDES.has(w)))];
 }
 
-// Choisit les passages les plus utiles pour la question, dans la limite de la mémoire du modèle
-function docsContext(query) {
-  if (!els.useDocs.checked) return null;
-  const actifs = docs.filter((d) => d.use);
-  if (!actifs.length) return null;
-  const budget = settings.provider === "claude" ? 60000 : 6000;
+const normTxt = (t) => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function docsBudget() { return settings.provider === "claude" ? 60000 : 6000; }
+const refOf = (c) => "[" + c.doc + (c.label ? ", " + c.label : "") + "]";
+
+// Tous les extraits des documents cochés, notés selon la question
+function rankChunks(query) {
   const all = [];
-  actifs.forEach((d) => d.chunks.forEach((c) => all.push({ doc: d.name, label: c.label, text: c.text, norm: c.text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") })));
+  docs.filter((d) => d.use).forEach((d) => d.chunks.forEach((c, i) =>
+    all.push({ id: d.name + "|" + i, doc: d.name, label: c.label, text: c.text, norm: normTxt(c.text) })));
   const keys = motsCles(query);
   const df = {};
   keys.forEach((k) => (df[k] = all.filter((c) => c.norm.includes(k)).length));
@@ -1365,6 +1470,15 @@ function docsContext(query) {
       if (occ) c.score += (1 + Math.log(occ)) * Math.log(1 + all.length / df[k]);
     });
   });
+  return all;
+}
+
+// Rédaction : choisit les passages les plus utiles, dans la limite de la mémoire du modèle
+function docsContext(query) {
+  if (!els.useDocs.checked) return null;
+  if (!docs.some((d) => d.use)) return null;
+  const budget = docsBudget();
+  const all = rankChunks(query);
   const total = all.reduce((s, c) => s + c.text.length, 0);
   let chosen;
   if (total <= budget) chosen = all;                       // tout tient : on envoie tout
@@ -1376,13 +1490,226 @@ function docsContext(query) {
     });
     if (!chosen.length) return null;
   }
-  const ref = (c) => "[" + c.doc + (c.label ? ", " + c.label : "") + "]";
   const text = "Documents de référence (extraits) :\n\n" +
-    chosen.map((c) => ref(c) + "\n" + c.text).join("\n\n") +
-    "\n\nAppuie-toi sur ces extraits quand c'est utile et cite la source entre crochets, par exemple " + ref(chosen[0]) +
+    chosen.map((c) => refOf(c) + "\n" + c.text).join("\n\n") +
+    "\n\nAppuie-toi sur ces extraits quand c'est utile et cite la source entre crochets, par exemple " + refOf(chosen[0]) +
     ". Si l'information demandée n'y figure pas, dis-le clairement au lieu d'inventer.\n\n---\n\n";
   const nDocs = new Set(chosen.map((c) => c.doc)).size;
   return { text, label: nDocs + " document" + (nDocs > 1 ? "s" : "") + " · " + chosen.length + " extrait" + (chosen.length > 1 ? "s" : "") };
+}
+
+/* ---------------------------------------------------------------------
+   ONGLET CHAT DOCUMENTS — conversation et consignes séparées de la Rédaction
+   Optimisations :
+   1. résumé automatique des anciens échanges quand la discussion s'allonge ;
+   2. recherche qui suit le fil (mots de la question + des questions précédentes) ;
+   3. extraits réutilisés : ceux déjà envoyés restent à la même place, les nouveaux
+      s'ajoutent à la fin, ce qui permet à LM Studio de ne pas tout relire.
+--------------------------------------------------------------------- */
+const CHAT_MAX_MESSAGES = 10;   // au-delà, les anciens échanges sont résumés
+const CHAT_KEEP_MESSAGES = 4;   // échanges gardés en entier après résumé
+
+function chatSystemPrompt() {
+  const lines = [
+    "Tu es l'assistant documentaire d'un ingénieur routier et VRD, dans un panneau de Microsoft Word. Tu réponds à ses questions en t'appuyant sur les extraits de documents fournis ci-dessous (CCTP, RC, CCAP, rapports…).",
+    "",
+    "Règles :",
+    "- Réponds en français, de façon claire et structurée. Texte brut, sans Markdown (pas de **, pas de #) ; utilise des tirets « - » pour les listes.",
+    "- Pour chaque information tirée des documents, cite la source entre crochets, par exemple [CCTP.pdf, p. 12].",
+    "- Si l'information ne figure pas dans les extraits, dis-le clairement (« Je ne trouve pas cette information dans les documents joints. »). Tu peux ensuite donner une réponse générale en précisant qu'elle ne vient pas des documents.",
+    "- N'invente jamais de chiffres, de dates, de montants, de normes ni de références.",
+    "- Tu n'es pas en mode rédaction : ne réécris pas le texte de l'utilisateur, sauf s'il te le demande.",
+  ];
+  if (settings.context) lines.push("", "Contexte de l'utilisateur : " + settings.context);
+  if (chatPool.length) {
+    lines.push("", "Extraits des documents :", "");
+    chatPool.forEach((c) => lines.push(refOf(c), c.text, ""));
+  } else if (!docs.some((d) => d.use)) {
+    lines.push("", "Aucun document n'est joint pour l'instant : indique-le si la question porte sur un document.");
+  }
+  if (chatSummary) lines.push("", "Résumé de la discussion précédente :", chatSummary);
+  return lines.join("\n");
+}
+
+// Ajoute au « stock » d'extraits ceux utiles pour la question, sans réordonner les anciens
+function updateChatPool(query) {
+  const actifs = new Set(docs.filter((d) => d.use).map((d) => d.name));
+  const before = chatPool.length;
+  chatPool = chatPool.filter((c) => actifs.has(c.doc));
+  if (!actifs.size) return;
+  const budget = docsBudget();
+  const all = rankChunks(query);
+  const total = all.reduce((s, c) => s + c.text.length, 0);
+  if (total <= budget) {                                   // tout tient : stock complet et stable
+    if (chatPool.length !== all.length || chatPool.length !== before) chatPool = all;
+    return;
+  }
+  const inPool = new Set(chatPool.map((c) => c.id));
+  let used = chatPool.reduce((s, c) => s + c.text.length, 0);
+  const best = all.filter((c) => c.score > 0 && !inPool.has(c.id)).sort((a, b) => b.score - a.score).slice(0, 4);
+  best.forEach((c) => {
+    while (used + c.text.length > budget && chatPool.length) used -= chatPool.shift().text.length; // retire les plus anciens
+    if (used + c.text.length <= budget) { chatPool.push(c); used += c.text.length; }
+  });
+}
+
+function renderChatDocs() {
+  els.chatDocs.innerHTML = "";
+  if (!docs.length) {
+    els.chatDocs.innerHTML = '<p class="hint">Aucun document. Cliquez sur « + Ajouter » pour déposer un CCTP, un RC, un rapport…</p>';
+    return;
+  }
+  docs.forEach((d) => {
+    const row = document.createElement("label");
+    row.className = "chat-doc";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = d.use;
+    cb.addEventListener("change", () => { d.use = cb.checked; saveDocs(); });
+    const name = document.createElement("span");
+    name.className = "doc-name";
+    name.textContent = "📄 " + d.name;
+    const size = document.createElement("span");
+    size.className = "muted";
+    size.textContent = Math.round(d.chars / 1000) + " k car.";
+    row.append(cb, name, size);
+    els.chatDocs.appendChild(row);
+  });
+}
+
+function newChat() {
+  stopGeneration();
+  chatHistory = [];
+  chatSummary = "";
+  chatPool = [];
+  els.dchat.innerHTML = "";
+}
+
+function chatBubble(cls, text) {
+  const root = document.createElement("div");
+  root.className = "msg " + cls;
+  const body = document.createElement("div");
+  body.className = "body";
+  body.textContent = text;
+  root.appendChild(body);
+  els.dchat.appendChild(root);
+  els.chatMain.scrollTop = els.chatMain.scrollHeight;
+  return { root, body };
+}
+
+// Résume les anciens échanges pour alléger ce que le modèle doit relire
+async function summarizeChat(call) {
+  if (chatHistory.length < CHAT_MAX_MESSAGES) return;
+  const old = chatHistory.slice(0, chatHistory.length - CHAT_KEEP_MESSAGES);
+  const transcript = old.map((m) => (m.role === "user" ? "Question : " : "Réponse : ") + m.content).join("\n\n");
+  let sum = "";
+  const note = chatBubble("note", "Résumé des anciens échanges en cours…");
+  await call([{ role: "user", content: "Résume en 8 lignes maximum les points importants de cette discussion : questions posées, réponses obtenues, chiffres et références cités (avec leurs sources entre crochets).\n\n" + (chatSummary ? "Résumé précédent :\n" + chatSummary + "\n\n" : "") + transcript }],
+    (t) => (sum += t), controller.signal, 0.2, "Tu résumes des discussions de façon factuelle et concise, en français, sans Markdown.");
+  chatSummary = cleanText(withoutThinking(sum));
+  chatHistory = chatHistory.slice(-CHAT_KEEP_MESSAGES);
+  note.body.textContent = "ℹ Les anciens échanges ont été résumés pour que les réponses restent rapides.";
+}
+
+async function chatSend() {
+  if (controller) return;
+  const q = els.dprompt.value.trim();
+  if (!q) return;
+  if (settings.provider === "claude" && !settings.apiKey) { openSettings(); toast("Ajoutez d'abord votre clé API Claude."); return; }
+  els.dprompt.value = "";
+  chatBubble("user", q);
+
+  // Recherche qui suit le fil : la question + les deux précédentes
+  const previous = chatHistory.filter((m) => m.role === "user").slice(-2).map((m) => m.content);
+  updateChatPool([q].concat(previous).join(" "));
+
+  const call = settings.provider === "claude" ? callClaude : callLMStudio;
+  setBusy(true);
+  controller = new AbortController();
+  let bubble = null, raw = "";
+  try {
+    await summarizeChat(call);
+    chatHistory.push({ role: "user", content: q });
+    bubble = chatBubble("assistant", "");
+    bubble.body.classList.add("streaming");
+    await call(chatHistory, (t) => {
+      raw += t;
+      bubble.body.textContent = withoutThinking(raw) || "Réflexion…";
+      els.chatMain.scrollTop = els.chatMain.scrollHeight;
+    }, controller.signal, 0.3, chatSystemPrompt());
+    const answer = cleanText(withoutThinking(raw));
+    if (!answer) throw new Error("Le modèle n'a renvoyé aucun texte.");
+    bubble.body.textContent = answer;
+    chatHistory.push({ role: "assistant", content: answer });
+    if (chatPool.length) {
+      const src = document.createElement("div");
+      src.className = "wc";
+      src.textContent = "📄 " + new Set(chatPool.map((c) => c.doc)).size + " document(s) · " + chatPool.length + " extrait(s) consultés";
+      bubble.root.appendChild(src);
+    }
+    addTools(bubble, answer, "chat");
+  } catch (e) {
+    const partial = cleanText(withoutThinking(raw));
+    if (e.name === "AbortError" && bubble) {
+      bubble.body.textContent = partial + (partial ? "\n\n" : "") + "[Réponse interrompue]";
+      if (partial) chatHistory.push({ role: "assistant", content: partial });
+      else chatHistory.pop();
+    } else {
+      if (bubble) bubble.root.remove();
+      if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") chatHistory.pop();
+      chatBubble("error", "⚠ " + e.message);
+    }
+  } finally {
+    if (bubble) bubble.body.classList.remove("streaming");
+    setBusy(false);
+    els.chatMain.scrollTop = els.chatMain.scrollHeight;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   EXPORT EN PROMPT : le comportement de l'outil, à coller dans un autre chat
+--------------------------------------------------------------------- */
+function openExportPrompt() {
+  els.exportSource.innerHTML = "";
+  els.exportSource.add(new Option("Réglages actuels" + (selectedAction ? " (" + selectedAction.label + ")" : ""), ""));
+  loadFavorites().forEach((f) => els.exportSource.add(new Option("★ " + f.name, f.name)));
+  buildExportPrompt();
+  showPanel(els.promptPanel);
+}
+
+function buildExportPrompt() {
+  const fav = loadFavorites().find((f) => f.name === els.exportSource.value);
+  const saved = options;
+  const action = fav ? ACTIONS.find((a) => a.label === fav.action) : selectedAction;
+  if (fav) options = sanitizeOptions(fav.options || {});
+  const reglages = optionsConsigne().trim();
+  const resume = optionsResume();
+  options = saved;
+  const out = [
+    "# Assistant de rédaction — ingénierie routière et VRD",
+    "",
+    "Tu vas m'aider à rédiger. Applique les consignes ci-dessous à chaque texte que je t'enverrai.",
+    "",
+    "## Rôle et règles",
+    systemPrompt().replace("intégré dans Microsoft Word, sous forme de panneau latéral", "spécialisé en ingénierie"),
+  ];
+  if (action) out.push("", "## Tâche à réaliser : " + action.label, action.consigne);
+  if (reglages) out.push("", "## Réglages du texte" + (resume ? " (" + resume + ")" : ""), reglages);
+  out.push("", "## Mode d'emploi",
+    "Je t'envoie un texte entre <<< et >>>, éventuellement avec une consigne en plus. Réponds uniquement avec le texte transformé, prêt à coller dans mon document.",
+    "Si je te pose une question à la place, réponds-y normalement en respectant les mêmes règles.");
+  els.exportText.value = out.join("\n");
+}
+
+function downloadText(text, filename) {
+  try {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast("Fichier téléchargé ✓");
+  } catch (_) { toast("Téléchargement impossible : utilisez « Copier »."); }
 }
 
 /* ---------------------------------------------------------------------
