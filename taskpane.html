@@ -9,20 +9,23 @@
 </head>
 <body>
 
+  <!-- BARRE DU HAUT : 5 boutons -->
   <header class="topbar">
-    <div class="brand">Assistant IA <span id="engine-badge" class="badge"></span></div>
-    <div class="topbar-actions">
-      <button id="btn-docs" class="icon-btn" title="Documents de référence"><svg viewBox="0 0 24 24"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 17h5"/></svg><span id="docs-count" class="count-dot" hidden></span></button>
-      <button id="btn-history" class="icon-btn" title="Historique des résultats"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></button>
-      <button id="btn-new" class="icon-btn" title="Nouvelle conversation"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></svg></button>
+    <div class="brand">Assistant IA</div>
+    <nav class="topbar-actions">
+      <button id="nav-redac" class="icon-btn on" title="Rédaction"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></button>
+      <button id="btn-docs" class="icon-btn" title="Documents"><svg viewBox="0 0 24 24"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 17h5"/></svg><span id="docs-count" class="count-dot" hidden></span></button>
+      <button id="btn-history" class="icon-btn" title="Historique"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></button>
       <button id="btn-settings" class="icon-btn" title="Paramètres"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg></button>
-    </div>
+      <button id="btn-new" class="icon-btn" title="Tout réinitialiser"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5V9h4.5"/></svg></button>
+    </nav>
   </header>
 
-  <nav class="tabs">
-    <button id="tab-redac" class="tab on">Rédaction</button>
-    <button id="tab-chat" class="tab">Documents</button>
-  </nav>
+  <div id="reset-confirm" class="confirm-bar" hidden>
+    <span>Tout réinitialiser ?</span>
+    <button id="btn-reset-yes" class="primary small">Oui</button>
+    <button id="btn-reset-no" class="ghost small">Non</button>
+  </div>
 
   <!-- PARAMÈTRES -->
   <section id="settings" class="settings" hidden>
@@ -79,6 +82,26 @@
     </label>
     <p class="hint">Noms de lieux, références, codes… L'IA doit les recopier tels quels. Un avertissement s'affiche si l'un d'eux disparaît.</p>
 
+    <label>Affichage</label>
+    <div class="read-row">
+      <label class="switch"><input type="checkbox" id="set-easy"><span class="slider"></span> Lecture facile</label>
+    </div>
+    <div class="read-row">
+      <select id="set-font" title="Police du panneau">
+        <option value="OpenDyslexic">OpenDyslexic</option>
+        <option value="Lexend">Lexend</option>
+        <option value="Atkinson Hyperlegible">Atkinson Hyperlegible</option>
+        <option value="Arial">Arial</option>
+        <option value="Verdana">Verdana</option>
+      </select>
+      <select id="set-size" title="Taille du texte">
+        <option value="1">Taille normale</option>
+        <option value="1.15">Grande</option>
+        <option value="1.3">Très grande</option>
+      </select>
+    </div>
+    <p class="hint">Change la police et la taille de tout le panneau, résultats compris. Le texte inséré dans Word garde la police de votre document.</p>
+
     <label>Sauvegarde des réglages</label>
     <p class="hint">Exporte vos réglages, favoris, règles et termes protégés (sans la clé API), pour les garder ou les partager avec un collègue.</p>
     <div class="row tight">
@@ -109,102 +132,66 @@
     </div>
   </section>
 
-  <!-- DOCUMENTS -->
-  <section id="docs-panel" class="settings" hidden>
-    <h2>Documents de référence</h2>
-    <p class="hint">Déposez vos pièces (CCTP, RC, rapports…) en PDF, Word ou texte. L'IA s'appuie sur les passages utiles et cite la source. Les documents restent sur cet ordinateur.</p>
-    <label class="drop" id="drop-zone">
-      <input type="file" id="docs-input" multiple accept=".pdf,.docx,.txt,.md" hidden>
-      <span>Cliquez ou glissez vos fichiers ici</span>
-      <small>PDF, Word (.docx), texte</small>
-    </label>
-    <p id="docs-status" class="hint"></p>
-    <div id="docs-list" class="history-list"></div>
-    <div class="row">
-      <button id="btn-docs-close" class="primary">Fermer</button>
-      <button id="btn-docs-clear" class="ghost">Tout retirer</button>
-    </div>
-  </section>
-
   <!-- HISTORIQUE -->
   <section id="history-panel" class="settings" hidden>
-    <h2>Historique des résultats</h2>
+    <h2>Historique</h2>
     <div id="nav-bar" class="nav-bar">
-      <button id="nav-prev" class="nav-btn" title="Résultat précédent"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button id="nav-prev" class="nav-btn" title="Plus ancien"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
       <span id="nav-pos"></span>
-      <button id="nav-next" class="nav-btn" title="Résultat suivant"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button id="nav-next" class="nav-btn" title="Plus récent"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
     <section id="browse" class="browse"></section>
-    <div class="section-head"><span class="section-title">Tous les résultats</span><span class="muted">30 derniers, sur cet ordinateur</span></div>
-    <div id="history-list" class="history-list"></div>
     <div class="row">
       <button id="btn-history-close" class="primary">Fermer</button>
       <button id="btn-history-clear" class="ghost">Effacer l'historique</button>
     </div>
   </section>
 
-  <!-- ZONE PRINCIPALE : fenêtre fixe, seuls le texte ciblé et le résultat défilent -->
+  <!-- RÉDACTION : fenêtre fixe, seuls le texte ciblé et le résultat défilent -->
   <main id="main" class="main fixed">
 
     <div id="browser-banner" class="banner" hidden>
-      <strong>Mode test hors de Word.</strong>
+      Mode test hors de Word
       <button id="btn-manifest" class="link-btn" hidden>Télécharger le manifeste</button>
     </div>
 
     <div class="top-zone">
       <section class="favs">
-        <span class="section-title">Favoris</span>
+        <span class="block-title">Favoris</span>
         <div id="fav-list" class="chips inline"></div>
-        <button id="btn-fav-add" class="link-btn" title="Enregistrer l'action et les réglages actuels">+ Enregistrer</button>
+        <button id="btn-fav-add" class="link-btn" title="Enregistrer l'action et les réglages actuels">+</button>
       </section>
       <div id="fav-form" class="fav-form" hidden>
-        <input id="fav-name" placeholder="Nom du favori, ex. Rapport MOA" maxlength="40">
-        <button id="btn-fav-ok" class="primary">OK</button>
-        <button id="btn-fav-cancel" class="ghost">Annuler</button>
+        <input id="fav-name" placeholder="Nom du favori" maxlength="40">
+        <button id="btn-fav-ok" class="primary small">OK</button>
+        <button id="btn-fav-cancel" class="ghost small">Annuler</button>
       </div>
 
-      <details id="options-box" class="options-box">
-        <summary><span class="section-title">Réglages</span> <span id="options-summary" class="muted"></span>
-          <button id="btn-options-clear" class="link-btn" hidden>Effacer</button></summary>
-
-        <div class="grp grp-ton">
-          <div class="grp-title">Ton</div>
-          <div id="tons" class="chips"></div>
-        </div>
-        <div class="grp grp-dom">
-          <div class="grp-title">Domaine d'activité</div>
-          <div id="opt-domaines" class="chips"></div>
-        </div>
-        <div class="grp grp-forme">
-          <div class="grp-title">Forme</div>
-          <div id="opt-forme" class="chips"></div>
-          <div class="grp-title sub">Longueur</div>
-          <div id="opt-longueur" class="chips"></div>
-          <div class="grp-title sub">Option</div>
-          <div id="opt-valeur" class="chips"></div>
-        </div>
-        <div class="grp grp-dest">
-          <div class="grp-title">Destinataire</div>
-          <div id="opt-destinataire" class="chips"></div>
-        </div>
+      <details id="actions-box" class="block" open>
+        <summary><span class="block-title">Action</span> <span id="action-summary" class="muted"></span></summary>
+        <section id="actions" class="actions grid3"></section>
       </details>
 
-      <div class="grp grp-act">
-        <div class="grp-title">Actions</div>
-        <section id="actions" class="actions flow"></section>
-        <div class="grp-title sub">Rédiger en style</div>
-        <section id="styles" class="actions flow"></section>
-      </div>
+      <details id="options-box" class="block">
+        <summary><span class="block-title">Réglages</span> <span id="options-summary" class="muted"></span>
+          <button id="btn-options-clear" class="link-btn" hidden>Effacer</button></summary>
+        <div class="grp"><div class="grp-title">Ton</div><div id="tons" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Domaine</div><div id="opt-domaines" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Style</div><div id="styles" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Forme</div><div id="opt-forme" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Longueur</div><div id="opt-longueur" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Mise en valeur</div><div id="opt-valeur" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Destinataire</div><div id="opt-destinataire" class="chips"></div></div>
+      </details>
     </div>
 
     <section class="card source">
       <div class="source-head">
-        <span class="source-title">Texte ciblé</span>
+        <span class="block-title">Texte ciblé</span>
         <span class="src-btns">
           <button id="btn-paste-source" class="link-btn">Coller</button>
           <button id="btn-copy-source" class="link-btn">Copier</button>
-          <button id="btn-select-source" class="link-btn">Sélectionner</button>
-          <button id="btn-clean-source" class="link-btn" title="Retire espaces en trop, coupures de ligne et caractères parasites (sans IA)">Nettoyer</button>
+          <button id="btn-select-source" class="link-btn" title="Sélectionner le texte">Sélect.</button>
         </span>
       </div>
       <div class="source-tools">
@@ -221,20 +208,26 @@
     <section id="chat" class="chat result-zone"></section>
   </main>
 
-  <!-- ONGLET CHAT DOCUMENTS -->
+  <!-- DOCUMENTS : dépôt des fichiers et questions, au même endroit -->
   <main id="chat-main" class="main fixed" hidden>
-    <section class="card">
+    <section class="card docs-card">
       <div class="source-head">
-        <span class="source-title">Documents joints</span>
-        <button id="btn-chat-add-docs" class="link-btn">+ Ajouter</button>
+        <span class="block-title">Documents</span>
+        <span class="src-btns">
+          <label class="link-btn" id="drop-zone" title="Ajouter des PDF, Word ou fichiers texte">+ Ajouter
+            <input type="file" id="docs-input" multiple accept=".pdf,.docx,.txt,.md" hidden>
+          </label>
+          <button id="btn-docs-clear" class="link-btn">Tout retirer</button>
+        </span>
       </div>
-      <div id="chat-docs" class="chat-docs"></div>
+      <div id="docs-list" class="docs-list"></div>
+      <div id="docs-status" class="count"></div>
     </section>
     <section id="dchat" class="chat result-zone"></section>
   </main>
 
   <footer id="composer-chat" class="composer-wrap" hidden>
-    <div class="composer-bar"><span class="muted">Posez vos questions sur les documents cochés.</span>
+    <div class="composer-bar"><span class="muted">Questions sur les documents cochés</span>
       <button id="btn-chat-new" class="link-btn">Nouvelle discussion</button></div>
     <div class="composer">
       <textarea id="dprompt" rows="2" placeholder="Une question sur les documents…"></textarea>
@@ -242,7 +235,6 @@
     </div>
   </footer>
 
-  <!-- SAISIE ET LANCEMENT -->
   <footer id="composer-redac" class="composer-wrap">
     <div class="composer-bar">
       <span id="sel-pill" class="sel-pill" hidden></span>
@@ -252,12 +244,12 @@
     <div id="suggest-menu" class="suggest-menu" hidden></div>
     <div class="composer">
       <textarea id="prompt" rows="2" placeholder="Une consigne pour affiner le texte…"></textarea>
-      <button id="btn-send" class="primary send" title="Lancer"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <button id="btn-send" class="primary send" title="Lancer (Entrée)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>
     <div class="composer-opts">
-      <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents de référence"><input type="checkbox" id="use-docs" checked> Documents</label>
-      <label class="toggle" title="L'IA propose deux versions différentes (deux fois plus long)"><input type="checkbox" id="two-versions"> 2 versions</label>
-      <label class="toggle" id="keep-format-wrap" title="Le texte remplacé garde la police, la taille et la couleur du passage d'origine"><input type="checkbox" id="keep-format" checked> Conserver la mise en forme</label>
+      <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents"><input type="checkbox" id="use-docs" checked> Documents</label>
+      <label class="toggle" title="Deux versions différentes (deux fois plus long)"><input type="checkbox" id="two-versions"> 2 versions</label>
+      <label class="toggle" id="keep-format-wrap" title="Garde la police, la taille et la couleur du passage d'origine"><input type="checkbox" id="keep-format" checked> Garder la mise en forme</label>
     </div>
   </footer>
 

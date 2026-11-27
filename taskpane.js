@@ -15,40 +15,39 @@
    mode "explication" → résultat à lire (proposé en commentaire Word)
 --------------------------------------------------------------------- */
 const ACTIONS = [
-  // --- Actions sur le texte, regroupées par famille ---
-  { famille: "Contrôle", label: "Corriger", mode: "correction", tons: false,
+  { label: "Corriger", mode: "correction", tons: false,
     consigne: "Corrige l'orthographe, la grammaire, la ponctuation, les accords et la typographie française de ce texte (espaces avant ; : ! ?, majuscules accentuées). Ne change ni le style, ni les mots, ni le contenu : modifie uniquement les fautes. Si le texte ne contient aucune faute, réponds uniquement : Phrase correcte." },
-  { famille: "Contrôle", label: "Vérifier la cohérence", mode: "coherence", tons: false,
+  { label: "Cohérence", mode: "coherence", tons: false,
     consigne: "Vérifie la cohérence interne de ce texte : chiffres, unités, dimensions, quantités, références, noms, lieux et dates qui se contredisent ou ne concordent pas. Ne modifie pas le texte. Liste chaque incohérence sur une ligne commençant par un tiret, en citant les passages concernés. Si tout est cohérent, réponds uniquement : Aucune incohérence trouvée." },
-  { famille: "Réécriture", label: "Reformuler", mode: "texte",
+  { label: "Reformuler", mode: "texte",
     consigne: "Reformule ce texte pour le rendre plus clair et plus fluide. Garde le sens, le niveau de détail et le registre." },
-  { famille: "Réécriture", label: "Structurer", mode: "texte",
+  { label: "Structurer", mode: "texte",
     consigne: "Réorganise ce texte dans un ordre logique et découpe-le en paragraphes précédés de courts intertitres. Garde autant que possible les phrases d'origine : ne change pas le contenu." },
-  { famille: "Réécriture", label: "Argumenter", mode: "texte",
+  { label: "Argumenter", mode: "texte",
     consigne: "Renforce l'argumentation de ce texte : développe le pourquoi de chaque choix et ajoute des justifications techniques. N'invente aucun fait, aucun chiffre ni aucune référence : si une preuve manque, écris [à compléter]." },
-  { famille: "Longueur", label: "Plus concis", mode: "texte",
-    consigne: "Rends ce texte plus concis (environ un tiers plus court) sans perdre d'information importante." },
-  { famille: "Longueur", label: "Résumer", mode: "texte",
+  { label: "Résumer", mode: "texte",
     consigne: "Résume ce texte en quelques phrases. Utilise des tirets si une liste est plus lisible." },
-  { famille: "Longueur", label: "Développer", mode: "texte",
+  { label: "Développer", mode: "texte",
     consigne: "Développe ce texte avec des transitions et une rédaction plus complète. N'invente aucun chiffre, aucune norme, aucune référence ni aucun fait absent du texte : si une précision manque, écris [à compléter]." },
-  { famille: "Compréhension", label: "Expliquer", mode: "explication",
+  { label: "Expliquer", mode: "explication",
     consigne: "Explique ce texte brièvement : de quoi il s'agit, le sens des termes techniques et les points à retenir. Ton explication doit être plus courte que le texte, jamais plus longue." },
-  { famille: "Compréhension", label: "Traduire (EN)", mode: "texte",
+  { label: "Traduire", mode: "texte",
     consigne: "Traduis ce texte en anglais professionnel." },
+];
 
-  // --- Styles de document ---
-  { label: "Rapport d'étude", mode: "texte", groupe: "style",
+/* Styles de document : un réglage (un seul choix). Choisi seul, il réécrit le texte dans ce style. */
+const STYLES = [
+  { label: "Rapport d'étude", mode: "texte",
     consigne: "Réécris ce texte dans le style d'un rapport d'étude (diagnostic, AVP, PRO) : neutre, impersonnel et argumenté. Présente l'existant, analyse, puis conclut." },
-  { label: "Notice explicative", mode: "texte", groupe: "style",
+  { label: "Notice explicative", mode: "texte",
     consigne: "Réécris ce texte dans le style d'une notice explicative : descriptive et concise. Explique ce qui est prévu (dispositions, matériaux, fonctionnement), sans argumenter." },
-  { label: "Appel d'offres", mode: "texte", groupe: "style",
+  { label: "Appel d'offres", mode: "texte",
     consigne: "Réécris ce texte dans le style d'une réponse à un appel d'offres (mémoire technique) : précis, engagé et vérifiable. Mets en avant la méthodologie, les moyens et les engagements du candidat, avec des formulations comme « Nous proposons… », « Notre équipe assurera… », « Le candidat s'engage à… »." },
-  { label: "Compte rendu", mode: "texte", groupe: "style",
+  { label: "Compte rendu", mode: "texte",
     consigne: "Réécris ce texte sous forme de compte rendu : factuel et structuré, avec l'objet, les participants s'ils sont mentionnés, les points abordés, les décisions prises et les actions à mener (qui, quoi, quand). N'invente aucun participant, aucune date ni aucune décision : écris [à compléter] si une information manque." },
-  { label: "Mail", mode: "texte", groupe: "style",
+  { label: "Email", mode: "texte",
     consigne: "Transforme ce texte en e-mail professionnel : courtois, clair et structuré (formule d'appel, objet en une phrase, demande ou information, formule de politesse)." },
-  { label: "Présentation", mode: "texte", groupe: "style",
+  { label: "Présentation", mode: "texte",
     consigne: "Réécris ce texte dans le style d'une présentation PowerPoint : phrases courtes et percutantes, centrées sur les mots-clés, prêtes à être collées dans une diapositive. Ne crée pas de diapositives complètes : transforme seulement ce texte." },
 ];
 
@@ -78,7 +77,9 @@ const TONS = [
   { groupe: "Lecture", label: "Pédagogique",   consigne: "explique simplement, définit les termes techniques" },
 ];
 // Anciens noms (réglages et favoris déjà enregistrés)
-const RENOMMAGES = { "Persuasif": "Convaincant", "Réseaux secs": "Réseaux", "Collègue technique": "Expert technique" };
+const RENOMMAGES = { "Persuasif": "Convaincant", "Réseaux secs": "Réseaux", "Collègue technique": "Expert technique",
+  "Vérifier la cohérence": "Cohérence", "Traduire (EN)": "Traduire", "Mail": "Email" };
+const AFFICHAGE_KEY = "assistant-ia-word.affichage";
 
 /* Tons contraires : quand l'un est coché, les autres sont grisés */
 const TONS_EXCLUSIFS = [
@@ -190,7 +191,12 @@ let docs = loadDocs();           // documents de référence
 let pastedSource = false;
 let lastSelection = "";          // dernière sélection Word non vide (gardée quand on désélectionne)
 let selectionKept = false;
-let lastReplace = null;          // dernier remplacement, pour pouvoir l'annuler        // texte ciblé collé à la main dans Word
+let lastReplace = null;          // dernier remplacement, pour pouvoir l'annuler
+let lastOriginal = null;         // texte d'origine du dernier remplacement
+let lastReplacedText = null;     // texte inséré par le dernier remplacement
+let lastRunKey = "";
+let variante = false;
+let lastActionLabel = "";        // dernière action lancée            // true : relance de la même demande → plus de créativité             // pour donner une variante quand on relance la même action        // texte ciblé collé à la main dans Word
 let currentTab = "redac";
 // Onglet Chat documents : sa propre conversation, totalement séparée de la Rédaction
 let chatHistory = [];
@@ -206,7 +212,8 @@ const els = {
   forme: $("opt-forme"), longueur: $("opt-longueur"), destinataire: $("opt-destinataire"),
   optionsSummary: $("options-summary"), selPill: $("sel-pill"), twoVersions: $("two-versions"),
   rules: $("set-rules"), protectedTerms: $("set-protected"),
-  historyPanel: $("history-panel"), historyList: $("history-list"),
+  historyPanel: $("history-panel"), actionSummary: $("action-summary"), resetBar: $("reset-confirm"),
+  easy: $("set-easy"), font: $("set-font"), size: $("set-size"),
   docsPanel: $("docs-panel"), docsList: $("docs-list"), docsStatus: $("docs-status"), docsInput: $("docs-input"),
   docsCount: $("docs-count"), useDocs: $("use-docs"), useDocsWrap: $("use-docs-wrap"),
   favList: $("fav-list"), favForm: $("fav-form"), favName: $("fav-name"),
@@ -235,21 +242,26 @@ function start(inWord) {
     b.title = a.consigne;
     b.addEventListener("click", () => selectAction(selectedAction === a ? null : a));
     a.button = b;
-    (a.groupe === "style" ? els.styles : els.actions).appendChild(b);
+    els.actions.appendChild(b);
   });
   renderOptions();
+  applyAffichage();
   $("btn-options-clear").addEventListener("click", () => {
-    options = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "", valeur: false };
+    options = optionsVides();
     saveOptions(); renderOptions();
   });
+  $("nav-redac").addEventListener("click", () => switchTab("redac"));
+  $("btn-new").addEventListener("click", () => (els.resetBar.hidden = false));
+  $("btn-reset-no").addEventListener("click", () => (els.resetBar.hidden = true));
+  $("btn-reset-yes").addEventListener("click", resetAll);
+  [els.easy, els.font, els.size].forEach((x) => x.addEventListener("change", saveAffichage));
   els.selPill.addEventListener("click", () => selectAction(null));
   $("btn-history").addEventListener("click", openHistory);
   $("btn-history-close").addEventListener("click", closePanels);
-  $("btn-docs").addEventListener("click", () => { renderDocs(); showPanel(els.docsPanel); });
-  $("btn-docs-close").addEventListener("click", closePanels);
+  $("btn-docs").addEventListener("click", () => switchTab("chat"));
   $("btn-docs-clear").addEventListener("click", () => { docs = []; saveDocs(); renderDocs(); });
   els.docsInput.addEventListener("change", () => { addDocuments([...els.docsInput.files]); els.docsInput.value = ""; });
-  const drop = $("drop-zone");
+  const drop = els.chatMain; // toute la page Documents accepte les fichiers glissés
   drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
   drop.addEventListener("dragleave", () => drop.classList.remove("over"));
   drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); addDocuments([...e.dataTransfer.files]); });
@@ -272,7 +284,6 @@ function start(inWord) {
   });
   $("btn-paste-source").addEventListener("click", pasteSource);
   $("btn-select-source").addEventListener("click", () => selectTextIn(els.manual.hidden ? els.preview : els.manual));
-  $("btn-clean-source").addEventListener("click", cleanSource);
   els.manual.addEventListener("input", updateSourceCount);
   $("btn-suggest").addEventListener("click", () => (els.suggestMenu.hidden = !els.suggestMenu.hidden));
   SUGGESTIONS.forEach((t) => {
@@ -291,9 +302,6 @@ function start(inWord) {
   $("btn-export-copy").addEventListener("click", async () => { await copyText(els.exportText.value); toast("Prompt copié"); });
   $("btn-export-dl").addEventListener("click", () => downloadText(els.exportText.value, "prompt-assistant-ia.txt"));
   $("btn-export-close").addEventListener("click", openSettings);
-  $("tab-redac").addEventListener("click", () => switchTab("redac"));
-  $("tab-chat").addEventListener("click", () => switchTab("chat"));
-  $("btn-chat-add-docs").addEventListener("click", () => { renderDocs(); showPanel(els.docsPanel); });
   $("btn-chat-new").addEventListener("click", newChat);
   els.dsend.addEventListener("click", () => (controller ? stopGeneration() : chatSend()));
   els.dprompt.addEventListener("keydown", (e) => {
@@ -307,13 +315,12 @@ function start(inWord) {
   if (!IN_WORD) $("keep-format-wrap").hidden = true;
   $("btn-history-clear").addEventListener("click", () => {
     try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
-    browseIndex = -1; renderHistory(); els.browse.innerHTML = '<p class="hint">Aucun résultat pour l\'instant.</p>'; updateNav();
+    browseIndex = -1; els.browse.innerHTML = '<p class="hint">Aucun résultat pour l\'instant.</p>'; updateNav();
   });
 
   $("btn-settings").addEventListener("click", openSettings);
   $("btn-cancel").addEventListener("click", closeSettings);
   $("btn-save").addEventListener("click", saveSettings);
-  $("btn-new").addEventListener("click", newConversation);
   $("btn-test").addEventListener("click", testLMStudio);
   $("btn-manifest").addEventListener("click", downloadManifest);
   els.provider.addEventListener("change", showProviderFields);
@@ -340,31 +347,79 @@ function start(inWord) {
     if (location.protocol === "https:") $("btn-manifest").hidden = false;
   }
 
-  updateBadge();
-  if (!settings.saved) openSettings();
+  renderDocs();
 }
 
-/* Un seul panneau (paramètres, historique, documents) affiché à la fois */
+/* Un seul écran à la fois : Rédaction, Documents, Historique, Paramètres */
 function showPanel(panel) {
-  [els.settings, els.historyPanel, els.docsPanel, els.promptPanel].forEach((p) => (p.hidden = p !== panel));
+  [els.settings, els.historyPanel, els.promptPanel].forEach((p) => (p.hidden = p !== panel));
   els.main.hidden = true;
   els.chatMain.hidden = true;
+  els.composerRedac.hidden = true;
+  els.composerChat.hidden = true;
+  highlightNav(panel === els.historyPanel ? "btn-history" : "btn-settings");
 }
 function closePanels() {
-  [els.settings, els.historyPanel, els.docsPanel, els.promptPanel].forEach((p) => (p.hidden = true));
+  [els.settings, els.historyPanel, els.promptPanel].forEach((p) => (p.hidden = true));
   els.main.hidden = currentTab !== "redac";
   els.chatMain.hidden = currentTab !== "chat";
-  if (currentTab === "chat") renderChatDocs();
+  els.composerRedac.hidden = currentTab !== "redac";
+  els.composerChat.hidden = currentTab !== "chat";
+  if (currentTab === "chat") renderDocs();
+  highlightNav(currentTab === "chat" ? "btn-docs" : "nav-redac");
+}
+function highlightNav(id) {
+  ["nav-redac", "btn-docs", "btn-history", "btn-settings"].forEach((x) => $(x).classList.toggle("on", x === id));
 }
 
-/* Onglets Rédaction / Chat documents */
 function switchTab(tab) {
   currentTab = tab;
-  $("tab-redac").classList.toggle("on", tab === "redac");
-  $("tab-chat").classList.toggle("on", tab === "chat");
-  els.composerRedac.hidden = tab !== "redac";
-  els.composerChat.hidden = tab !== "chat";
   closePanels();
+}
+
+/* Bouton « Tout réinitialiser » (après confirmation) : vide la page,
+   remet les réglages à zéro. Favoris, documents et historique sont conservés. */
+function resetAll() {
+  els.resetBar.hidden = true;
+  newConversation();
+  newChat();
+  selectAction(null);
+  options = optionsVides();
+  saveOptions(); renderOptions();
+  els.prompt.value = "";
+  els.dprompt.value = "";
+  els.manual.value = "";
+  lastSelection = ""; frozenSource = null; lastReplace = null; lastOriginal = null; lastReplacedText = null;
+  if (IN_WORD) {
+    pastedSource = false;
+    els.manual.hidden = true;
+    els.preview.hidden = false;
+    els.follow.checked = true;
+    els.wholeDoc.checked = false;
+    els.preview.className = "preview empty";
+    els.preview.textContent = "Sélectionnez du texte dans Word…";
+  }
+  els.sourceCount.textContent = "";
+  switchTab("redac");
+  toast("Tout est réinitialisé");
+}
+
+/* Lecture facile : police et taille de tout le panneau */
+function loadAffichage() {
+  try { return Object.assign({ easy: false, font: "OpenDyslexic", size: "1" }, JSON.parse(localStorage.getItem(AFFICHAGE_KEY) || "{}")); }
+  catch (_) { return { easy: false, font: "OpenDyslexic", size: "1" }; }
+}
+function applyAffichage() {
+  const a = loadAffichage();
+  els.easy.checked = a.easy; els.font.value = a.font; els.size.value = a.size;
+  document.body.classList.toggle("easy", a.easy);
+  document.documentElement.style.setProperty("--easy-font", '"' + a.font + '"');
+  document.documentElement.style.setProperty("--zoom", a.easy ? a.size : "1");
+}
+function saveAffichage() {
+  const a = { easy: els.easy.checked, font: els.font.value, size: els.size.value };
+  try { localStorage.setItem(AFFICHAGE_KEY, JSON.stringify(a)); } catch (_) {}
+  applyAffichage();
 }
 
 if (typeof Office !== "undefined" && Office.onReady) {
@@ -383,6 +438,11 @@ async function getSourceText() {
   if (els.wholeDoc.checked) return readWord();
   if (!els.follow.checked && frozenSource !== null) return frozenSource;
   const text = await readWord();
+  // Après « Remplacer », Word sélectionne le nouveau texte : on repart toujours du texte d'origine
+  if (text && lastReplacedText && lastOriginal && text.replace(/\s+/g, " ").trim() === lastReplacedText.replace(/\s+/g, " ").trim()) {
+    selectionKept = true;
+    return lastOriginal;
+  }
   if (text) { lastSelection = text; return text; }
   // Rien n'est sélectionné : on garde le dernier texte sélectionné
   if (lastSelection) { selectionKept = true; return lastSelection; }
@@ -431,7 +491,7 @@ async function refreshPreview() {
     }
     els.preview.className = "preview";
     els.preview.textContent = els.wholeDoc.checked ? "Tout le document est ciblé." : text;
-    const etat = els.wholeDoc.checked ? "" : !els.follow.checked ? " · figé" : selectionKept ? " · sélection conservée" : "";
+    const etat = els.wholeDoc.checked ? "" : !els.follow.checked ? " · figé" : selectionKept ? " · texte d'origine" : "";
     els.sourceCount.textContent = countWords(text).toLocaleString("fr-FR") + " mots · " + text.length.toLocaleString("fr-FR") + " caractères" + etat;
   } catch (e) {
     console.error(e);
@@ -518,6 +578,8 @@ async function wordReplace(text) {
     ctx.trackedObjects.add(r);
     await ctx.sync();
     lastReplace = { range: r, original };
+    lastOriginal = original.trim();
+    lastReplacedText = sansMarques(text);
   });
 }
 
@@ -531,6 +593,7 @@ async function undoReplace() {
     await ctx.sync();
   });
   lastReplace = null;
+  lastReplacedText = null;
 }
 
 async function wordInsertAfter(text) {
@@ -564,10 +627,16 @@ async function launch() {
   if (controller) return;
   els.suggestMenu.hidden = true;
   const extra = els.prompt.value.trim();
-  if (selectedAction) {
-    const action = selectedAction;
-    const ok = await runAction(action, extra);
-    if (ok) { els.prompt.value = ""; selectAction(null); }
+  // Une consigne écrite juste après un résultat (même action, même texte) affine ce résultat
+  if (selectedAction && extra && history.length && lastActionLabel === selectedAction.label) {
+    const src = await safeGetSource();
+    if (src === lastSentSource) { await sendPrompt(extra); updateModeHint(); return; }
+  }
+  const styleSeul = !selectedAction && !extra && options.style ? STYLES.find((x) => x.label === options.style) : null;
+  if (selectedAction || styleSeul) {
+    // L'action reste choisie : relancer donne une nouvelle variante, toujours depuis le texte d'origine
+    const ok = await runAction(selectedAction || Object.assign({}, styleSeul, { estStyle: true }), extra);
+    if (ok) els.prompt.value = "";
   } else if (extra) {
     await sendPrompt(extra);
   } else {
@@ -579,7 +648,9 @@ async function launch() {
 // Indique ce que fera la consigne écrite dans le champ
 function updateModeHint() {
   if (!els.modeHint) return;
-  els.modeHint.textContent = selectedAction ? "précise l'action"
+  els.modeHint.textContent = selectedAction && history.length && lastActionLabel === selectedAction.label
+    ? "Vide : nouvelle variante · consigne : affine"
+    : selectedAction ? "Consigne : précise l'action"
     : history.length ? "Consigne : affine le dernier résultat"
     : "Consigne : s'applique au texte ciblé";
 }
@@ -589,6 +660,7 @@ function selectAction(action) {
   ACTIONS.forEach((a) => a.button.classList.toggle("selected", a === action));
   els.selPill.hidden = !action;
   els.selPill.textContent = action ? action.label + "  ×" : "";
+  els.actionSummary.textContent = action ? "· " + action.label : "";
   els.send.classList.toggle("ready", !!action);
   updateModeHint();
 }
@@ -604,8 +676,12 @@ async function runAction(action, extra) {
   lastSentSource = source;
   const avecOptions = action.tons !== false;
   let consigne = action.consigne;
+  lastActionLabel = action.label;
+  const runKey = action.label + "|" + source + "|" + JSON.stringify(options) + "|" + (extra || "");
+  variante = runKey === lastRunKey;
+  lastRunKey = runKey;
   if (extra) consigne += "\n\nConsigne complémentaire de l'utilisateur : " + extra;
-  if (avecOptions) consigne += optionsConsigne();
+  if (avecOptions) consigne += optionsConsigne(action.estStyle);
   const ref = action.mode === "correction" ? null : docsContext(source + " " + (extra || ""));
   const resume = avecOptions ? optionsResume() : "";
   const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "") + (ref ? "\nDocuments : " + ref.label : "");
@@ -615,6 +691,7 @@ async function runAction(action, extra) {
 
 // Champ du bas sans action choisie : c'est toujours une consigne sur le texte, jamais une question
 async function sendPrompt(consigneUtilisateur) {
+  variante = false;
   const source = await safeGetSource();
   if (source === null) return;
   const suite = history.length && (!source || source === lastSentSource);
@@ -688,7 +765,7 @@ async function ask(content, displayLabel, attachedChars, mode, source, historyLa
         raw += chunk;
         bubble.body.textContent = sansMarques(withoutThinking(raw)) || "Réflexion…";
         scrollToBottom();
-      }, controller.signal, v === 1 ? 0.4 : 0.9);
+      }, controller.signal, v === 1 && !variante ? 0.4 : 0.9);
       const answer = cleanText(withoutThinking(raw), content.includes("Mise en valeur :"));
       if (!answer) throw new Error("Le modèle n'a renvoyé aucun texte.");
       if (firstAnswer === null) firstAnswer = answer;
@@ -801,8 +878,10 @@ function systemPrompt() {
 }
 
 // Consignes ajoutées à la demande selon les réglages du texte
-function optionsConsigne() {
+function optionsConsigne(styleDejaDansAction) {
   const parts = [];
+  const st = STYLES.find((x) => x.label === options.style);
+  if (st && !styleDejaDansAction) parts.push("Style : " + st.consigne);
   if (options.tons.length) {
     const choisis = TONS.filter((t) => options.tons.includes(t.label));
     let txt = "Ton (applique-les tous en même temps, sans contredire les règles de fiabilité) :\n" +
@@ -826,7 +905,7 @@ function optionsConsigne() {
 }
 
 function optionsResume() {
-  return options.tons.concat(options.domaines, [options.forme, options.longueur, options.destinataire, options.valeur ? "Mise en valeur" : ""].filter(Boolean)).join(", ");
+  return options.tons.concat(options.domaines, [options.style, options.forme, options.longueur, options.destinataire, options.valeur ? "Mise en valeur" : ""].filter(Boolean)).join(", ");
 }
 
 /* ---------------------------------------------------------------------
@@ -1076,13 +1155,13 @@ function addTools(bubble, text, mode) {
   const plain = sansMarques(text);
   if (IN_WORD) {
     if (mode === "chat") {
-      add("Insérer dans Word", async () => { await wordInsertAfter(text); toast("Texte inséré"); }, true);
-      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); });
+      add("Insérer", async () => { await wordInsertAfter(text); toast("Texte inséré"); }, true);
+      add("Commenter", async () => { await wordComment(text); toast("Commentaire ajouté"); });
     } else if (mode === "explication") {
-      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); }, true);
-      add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
+      add("Commenter", async () => { await wordComment(text); toast("Commentaire ajouté"); }, true);
+      add("Insérer", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
     } else {
-      add("Remplacer la sélection", async () => {
+      add("Remplacer", async () => {
         await wordReplace(text);
         toast("Sélection remplacée");
         // Bouton « Annuler » : remet le texte d'origine dans Word
@@ -1091,12 +1170,12 @@ function addTools(bubble, text, mode) {
         u.classList.add("undo");
         bar.insertBefore(u, bar.children[1]);
       }, true);
-      add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
-      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); });
+      add("Insérer", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
+      add("Commenter", async () => { await wordComment(text); toast("Commentaire ajouté"); });
     }
   }
   add("Copier", async () => { await copyText(plain); toast("Copié"); }, !IN_WORD);
-  add("Sélectionner", async () => selectTextIn(bubble.body));
+  add("Sélect.", async () => selectTextIn(bubble.body));
   bubble.root.appendChild(bar);
 }
 
@@ -1118,9 +1197,7 @@ function setBusy(busy) {
   if (!busy) { controller = null; renderOptions(); renderFavorites(); updateNav(); }
 }
 
-function updateBadge() {
-  els.badge.textContent = settings.provider === "claude" ? "Claude" : "LM Studio";
-}
+function updateBadge() { /* l'étiquette du moteur n'est plus affichée */ }
 
 function scrollToBottom() {
   els.chat.scrollTop = els.chat.scrollHeight;
@@ -1220,11 +1297,15 @@ async function downloadManifest() {
    TONS : affichage et mémorisation
 --------------------------------------------------------------------- */
 function loadOptions() {
-  const d = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "", valeur: false };
+  const d = optionsVides();
   try { return sanitizeOptions(Object.assign(d, JSON.parse(localStorage.getItem(OPTIONS_KEY) || "{}"))); } catch (_) { return d; }
 }
 
 // Retire les tons contraires (garde le premier coché)
+function optionsVides() {
+  return { tons: [], domaines: [], style: "", forme: "", longueur: "", destinataire: "", valeur: false };
+}
+
 function sanitizeOptions(o) {
   const kept = [];
   const rn = (x) => RENOMMAGES[x] || x;
@@ -1235,8 +1316,9 @@ function sanitizeOptions(o) {
     if (TONS.some((x) => x.label === t) && !kept.some((k) => tonsIncompatibles(k).has(t))) kept.push(t);
   });
   const domaines = (o.domaines || []).filter((x) => DOMAINES.some((d) => d.label === x));
+  const style = STYLES.some((x) => x.label === rn(o.style || "")) ? rn(o.style || "") : "";
   const dest = DESTINATAIRES.some((d) => d.label === o.destinataire) ? o.destinataire : "";
-  return { tons: kept, domaines, forme: o.forme || "", longueur: o.longueur || "", destinataire: dest, valeur: !!o.valeur };
+  return { tons: kept, domaines, style, forme: o.forme || "", longueur: o.longueur || "", destinataire: dest, valeur: !!o.valeur };
 }
 function saveOptions() {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
@@ -1256,15 +1338,7 @@ function chip(label, on, title, onClick, disabled) {
 function renderOptions() {
   // Tons : plusieurs choix
   els.tons.innerHTML = "";
-  let groupeCourant = "";
   TONS.forEach((t) => {
-    if (t.groupe !== groupeCourant) {
-      groupeCourant = t.groupe;
-      const h = document.createElement("div");
-      h.className = "group-label";
-      h.textContent = t.groupe;
-      els.tons.appendChild(h);
-    }
     const on = options.tons.includes(t.label);
     const bloquant = options.tons.find((x) => tonsIncompatibles(x).has(t.label));
     const titre = bloquant ? "Incompatible avec « " + bloquant + " »" : t.consigne;
@@ -1282,8 +1356,8 @@ function renderOptions() {
       saveOptions(); renderOptions();
     }, !!controller));
   });
-  // Forme, longueur, destinataire : un seul choix
-  [["forme", FORMES, els.forme], ["longueur", LONGUEURS, els.longueur], ["destinataire", DESTINATAIRES, els.destinataire]]
+  // Style, forme, longueur, destinataire : un seul choix
+  [["style", STYLES, els.styles], ["forme", FORMES, els.forme], ["longueur", LONGUEURS, els.longueur], ["destinataire", DESTINATAIRES, els.destinataire]]
     .forEach(([key, list, box]) => {
       box.innerHTML = "";
       list.forEach((o) => {
@@ -1295,7 +1369,7 @@ function renderOptions() {
       });
     });
   els.valeur.innerHTML = "";
-  els.valeur.appendChild(chip("Mise en valeur", options.valeur, "Met en gras quelques mots-clés et chiffres importants", () => {
+  els.valeur.appendChild(chip("Mots-clés en gras", options.valeur, "Met en gras quelques mots-clés et chiffres importants", () => {
     options.valeur = !options.valeur;
     saveOptions(); renderOptions();
   }, !!controller));
@@ -1328,30 +1402,7 @@ function openHistory() {
   showPanel(els.historyPanel);
 }
 
-function renderHistory() {
-  const list = loadHistory();
-  els.historyList.innerHTML = "";
-  list.forEach((h, idx) => {
-    const item = document.createElement("div");
-    item.className = "hist-item" + (idx === browseIndex ? " active" : "");
-    const head = document.createElement("div");
-    head.className = "hist-head";
-    const d = new Date(h.date);
-    head.textContent = h.label + " — " + d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-    const body = document.createElement("div");
-    body.className = "hist-body";
-    body.textContent = sansMarques(h.answer);
-    item.append(head, body);
-    item.addEventListener("click", () => {
-      browseIndex = idx;
-      showBrowse(h, idx === 0);
-      updateNav();
-      renderHistory();
-      els.historyPanel.scrollTop = 0;
-    });
-    els.historyList.appendChild(item);
-  });
-}
+function renderHistory() { /* la liste n'est plus affichée : navigation par flèches */ }
 
 /* ---------------------------------------------------------------------
    NAVIGATION ← → (panneau Historique) : texte de départ et résultat ensemble
@@ -1405,7 +1456,7 @@ function showBrowse(h, isCurrent) {
   cp.addEventListener("click", async () => { await copyText(h.source || ""); toast("Texte de départ copié"); });
   const sl = document.createElement("button");
   sl.className = "tool";
-  sl.textContent = "Sélectionner";
+  sl.textContent = "Sélect.";
   sl.addEventListener("click", () => selectTextIn(sb));
   sbar.append(cp, sl);
   src.append(st, sb, sbar);
@@ -1451,10 +1502,13 @@ function saveFavorite() {
 }
 
 function applyFavorite(f) {
-  options = sanitizeOptions(f.options || {});
+  const rn = (x) => RENOMMAGES[x] || x;
+  const fo = Object.assign({}, f.options || {});
+  if (STYLES.some((x) => x.label === rn(f.action))) fo.style = rn(f.action);   // anciens favoris : style choisi comme action
+  options = sanitizeOptions(fo);
   saveOptions();
   renderOptions();
-  selectAction(ACTIONS.find((a) => a.label === f.action) || null);
+  selectAction(ACTIONS.find((a) => a.label === rn(f.action)) || null);
   toast("Favori « " + f.name + " » activé — il ne reste qu'à lancer");
 }
 
@@ -1469,7 +1523,7 @@ function renderFavorites() {
     const wrap = document.createElement("span");
     wrap.className = "fav";
     const fo = sanitizeOptions(f.options || {});
-    const details = [f.action].concat(fo.tons, fo.domaines, [(f.options || {}).forme, (f.options || {}).longueur, (f.options || {}).destinataire]).filter(Boolean).join(", ");
+    const details = [f.action].concat(fo.tons, fo.domaines, [fo.style,(f.options || {}).forme, (f.options || {}).longueur, (f.options || {}).destinataire]).filter(Boolean).join(", ");
     const b = chip(f.name, false, details || "Réglages vides", () => applyFavorite(f), !!controller);
     const del = document.createElement("button");
     del.className = "fav-del";
@@ -1539,7 +1593,7 @@ function updateDocsBadge() {
   els.docsCount.textContent = actifs;
   els.useDocsWrap.hidden = !actifs;
   els.useDocsWrap.lastChild.textContent = " Documents (" + actifs + ")";
-  if (els.chatDocs && currentTab === "chat") renderChatDocs();
+
 }
 
 function loadScript(url) {
@@ -1623,7 +1677,7 @@ async function addDocuments(files) {
 function renderDocs() {
   els.docsList.innerHTML = "";
   if (!docs.length) {
-    els.docsList.innerHTML = '<p class="hint">Aucun document pour l\'instant.</p>';
+    els.docsList.innerHTML = '<p class="hint">Aucun document. Cliquez sur « + Ajouter » ou glissez vos fichiers ici (PDF, Word, texte).</p>';
     return;
   }
   docs.forEach((d) => {
@@ -1889,7 +1943,7 @@ function openExportPrompt() {
 function buildExportPrompt() {
   const fav = loadFavorites().find((f) => f.name === els.exportSource.value);
   const saved = options;
-  const action = fav ? ACTIONS.find((a) => a.label === fav.action) : selectedAction;
+  const action = fav ? ACTIONS.find((a) => a.label === (RENOMMAGES[fav.action] || fav.action)) : selectedAction;
   if (fav) options = sanitizeOptions(fav.options || {});
   const reglages = optionsConsigne().trim();
   const resume = optionsResume();
