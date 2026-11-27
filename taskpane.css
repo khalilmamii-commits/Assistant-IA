@@ -311,3 +311,90 @@ svg .fill { fill: currentColor; stroke: none; }
 .actions > .group-label { grid-column: 1 / -1; margin: 6px 0 -1px; }
 .actions > .group-label:first-child { margin-top: 0; }
 .sel-pill { letter-spacing: .01em; }
+
+/* =====================================================================
+   v8 — Fenêtre fixe et compacte
+   Seuls le texte ciblé et la zone de résultat défilent.
+   ===================================================================== */
+html, body { font-size: 12px; overflow: hidden; }
+.topbar { padding: 5px 10px; }
+.brand { font-size: 13px; }
+.icon-btn { width: 26px; height: 26px; }
+.icon-btn svg { width: 15px; height: 15px; }
+.tab { padding: 7px 0 6px; font-size: 10.5px; }
+
+.main.fixed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 6px 10px 0; }
+.main.fixed[hidden] { display: none !important; }
+.top-zone { flex: 0 1 auto; min-height: 0; max-height: 52%; overflow-y: auto; padding-bottom: 2px; }
+.banner { padding: 4px 8px; margin-bottom: 6px; font-size: 11px; display: flex; gap: 8px; align-items: center; }
+
+/* Favoris sur une ligne */
+.favs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; }
+.favs .section-title { font-size: 10.5px; }
+.chips.inline { display: inline-flex; flex-wrap: wrap; gap: 4px; flex: 1; }
+.chips.inline .muted { font-size: 11px; }
+#btn-fav-add { margin-left: auto; font-size: 11px; }
+
+/* Réglages repliés */
+.options-box { padding: 5px 8px; }
+.options-box summary { font-size: 11px; }
+.options-box summary .link-btn { margin-left: auto; }
+.chip { padding: 2px 8px; font-size: 11px; border-radius: 11px; }
+.chips { gap: 4px; }
+
+/* Cadres de couleur pâle par groupe */
+.grp { border-radius: 6px; padding: 5px 7px 6px; margin-top: 6px; border: 1px solid; }
+.grp-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #5f6773; margin-bottom: 4px; }
+.grp-title.sub { margin-top: 6px; }
+.grp-ton   { background: #f2f6fd; border-color: #dce6f6; }
+.grp-dom   { background: #f1f8f3; border-color: #d8eadc; }
+.grp-forme { background: #fbf7ef; border-color: #eee3cf; }
+.grp-dest  { background: #f8f2f4; border-color: #ecdde2; }
+.grp-act   { background: #f5f6f8; border-color: #e2e5e9; }
+.grp .chips > .group-label { color: #8a919c; font-size: 9.5px; margin-top: 4px; }
+
+/* Actions à la suite */
+.actions.flow { display: flex; flex-wrap: wrap; gap: 4px; }
+.actions.flow .action { width: auto; padding: 4px 9px; font-size: 11.5px; border-radius: 5px; }
+
+/* Texte ciblé */
+.source { flex: none; margin-top: 6px; padding: 6px 8px; }
+.source-head { margin-bottom: 3px; }
+.source-title { font-size: 10.5px; }
+.src-btns { gap: 9px; }
+.src-btns .link-btn { font-size: 11px; }
+.source-tools { margin: 0 0 4px; }
+.switch, .toggle { font-size: 11px; }
+.preview { max-height: 78px; overflow-y: auto; font-size: 11.5px; }
+#manual-text { font-size: 11.5px; max-height: 90px; }
+#source-count { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+
+/* Zone de résultat : prend la place restante et défile */
+.result-zone { flex: 1 1 auto; min-height: 80px; overflow-y: auto; margin-top: 6px; padding-bottom: 8px; gap: 8px; }
+.msg { padding: 6px 8px; font-size: 12px; }
+.msg-tools { margin-top: 6px; padding-top: 6px; }
+.tool { padding: 3px 7px; font-size: 11px; }
+.tool.undo { border-color: #d9a400; color: #7a5c00; background: #fff8e1; }
+.msg.assistant strong { font-weight: 700; }
+
+/* Saisie */
+.composer-wrap { padding: 5px 10px 6px; }
+.composer-bar { min-height: 18px; margin-bottom: 4px; font-size: 11px; }
+#mode-hint { font-size: 10.5px; }
+.suggest-btn { margin-left: auto; font-size: 11px; }
+.suggest-menu { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 5px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: #fafbfc; }
+.suggest-menu[hidden] { display: none; }
+.suggest-item { border: 1px solid var(--border); background: #fff; border-radius: 11px; padding: 2px 8px; font-size: 11px; color: var(--text); }
+.suggest-item:hover { border-color: var(--accent); color: var(--accent-dark); }
+.composer textarea { font-size: 12px; padding: 5px 7px; }
+.send { height: 32px; min-width: 36px; }
+.composer-opts { display: flex; gap: 12px; margin-top: 4px; flex-wrap: wrap; }
+.composer-opts .toggle { color: var(--muted); }
+
+/* Onglet Documents (chat) */
+#chat-main .card { flex: none; padding: 6px 8px; }
+.chat-docs { max-height: 90px; overflow-y: auto; }
+
+/* Historique : navigation dans le panneau */
+#history-panel .nav-bar { margin-top: 0; }
+.hist-item.active { border-color: var(--accent); background: var(--accent-soft); }

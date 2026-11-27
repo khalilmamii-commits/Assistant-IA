@@ -33,7 +33,7 @@ const ACTIONS = [
   { famille: "Longueur", label: "Développer", mode: "texte",
     consigne: "Développe ce texte avec des transitions et une rédaction plus complète. N'invente aucun chiffre, aucune norme, aucune référence ni aucun fait absent du texte : si une précision manque, écris [à compléter]." },
   { famille: "Compréhension", label: "Expliquer", mode: "explication",
-    consigne: "Explique ce texte simplement : de quoi il s'agit, le sens des termes techniques et les points à retenir." },
+    consigne: "Explique ce texte brièvement : de quoi il s'agit, le sens des termes techniques et les points à retenir. Ton explication doit être plus courte que le texte, jamais plus longue." },
   { famille: "Compréhension", label: "Traduire (EN)", mode: "texte",
     consigne: "Traduis ce texte en anglais professionnel." },
 
@@ -74,6 +74,7 @@ const TONS = [
   { groupe: "Attitude", label: "Convaincant",  consigne: "s'appuie sur des preuves et une logique solide pour convaincre un maître d'ouvrage ou un jury, de façon factuelle" },
   // Lecture
   { groupe: "Lecture", label: "Synthétique",   consigne: "va à l'essentiel, phrases courtes" },
+  { groupe: "Lecture", label: "Détaillé",      consigne: "développe chaque point avec précision, sans délayer ni répéter" },
   { groupe: "Lecture", label: "Pédagogique",   consigne: "explique simplement, définit les termes techniques" },
 ];
 // Anciens noms (réglages et favoris déjà enregistrés)
@@ -84,6 +85,7 @@ const TONS_EXCLUSIFS = [
   ["Formel", "Informel", "Familier"],
   ["Optimiste", "Pessimiste"],
   ["Synthétique", "Pédagogique"],
+  ["Synthétique", "Détaillé"],
   ["Technique", "Familier"],
   ["Neutre", "Optimiste"], ["Neutre", "Pessimiste"], ["Neutre", "Convaincant"], ["Neutre", "Enthousiaste"],
   ["Enthousiaste", "Pessimiste"],
@@ -155,6 +157,17 @@ const LIBS = {
   pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
   docx: "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
 };
+/* Suggestions de consignes (menu « Suggestions » au-dessus du champ) */
+const SUGGESTIONS = [
+  "Plus court",
+  "Garde le premier paragraphe tel quel",
+  "Remplace « … » par « … »",
+  "Ajoute un exemple concret",
+  "Mets les chiffres en valeur",
+  "Supprime les répétitions",
+  "Termine par une phrase de conclusion",
+];
+
 const ICONE_ENVOI = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 const ICONE_STOP = '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" class="fill"/></svg>';
 const PLACEHOLDER_URL = "https://VOTRE-PSEUDO.github.io/assistant-ia-word";
@@ -174,7 +187,10 @@ let selectedAction = null;       // action choisie, lancée par le bouton bleu
 let frozenSource = null;         // texte figé quand « Suivre la sélection » est désactivé
 let browseIndex = -1;            // -1 = conversation en cours ; sinon position dans l'historique
 let docs = loadDocs();           // documents de référence
-let pastedSource = false;        // texte ciblé collé à la main dans Word
+let pastedSource = false;
+let lastSelection = "";          // dernière sélection Word non vide (gardée quand on désélectionne)
+let selectionKept = false;
+let lastReplace = null;          // dernier remplacement, pour pouvoir l'annuler        // texte ciblé collé à la main dans Word
 let currentTab = "redac";
 // Onglet Chat documents : sa propre conversation, totalement séparée de la Rédaction
 let chatHistory = [];
@@ -195,7 +211,8 @@ const els = {
   docsCount: $("docs-count"), useDocs: $("use-docs"), useDocsWrap: $("use-docs-wrap"),
   favList: $("fav-list"), favForm: $("fav-form"), favName: $("fav-name"),
   follow: $("follow-sel"), navBar: $("nav-bar"), navPos: $("nav-pos"), browse: $("browse"),
-  domaines: $("opt-domaines"), promptPanel: $("prompt-panel"), exportSource: $("export-source"), exportText: $("export-text"),
+  domaines: $("opt-domaines"), valeur: $("opt-valeur"), sourceCount: $("source-count"), modeHint: $("mode-hint"),
+  suggestMenu: $("suggest-menu"), keepFormat: $("keep-format"), promptPanel: $("prompt-panel"), exportSource: $("export-source"), exportText: $("export-text"),
   chatMain: $("chat-main"), chatDocs: $("chat-docs"), dchat: $("dchat"), dprompt: $("dprompt"), dsend: $("btn-dsend"),
   composerRedac: $("composer-redac"), composerChat: $("composer-chat"),
   provider: $("set-provider"), cfgLms: $("cfg-lmstudio"), cfgClaude: $("cfg-claude"),
@@ -218,18 +235,11 @@ function start(inWord) {
     b.title = a.consigne;
     b.addEventListener("click", () => selectAction(selectedAction === a ? null : a));
     a.button = b;
-    if (a.groupe !== "style" && a.famille && !els.actions.querySelector('[data-famille="' + a.famille + '"]')) {
-      const h = document.createElement("div");
-      h.className = "group-label";
-      h.dataset.famille = a.famille;
-      h.textContent = a.famille;
-      els.actions.appendChild(h);
-    }
     (a.groupe === "style" ? els.styles : els.actions).appendChild(b);
   });
   renderOptions();
   $("btn-options-clear").addEventListener("click", () => {
-    options = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "" };
+    options = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "", valeur: false };
     saveOptions(); renderOptions();
   });
   els.selPill.addEventListener("click", () => selectAction(null));
@@ -261,6 +271,21 @@ function start(inWord) {
     refreshPreview();
   });
   $("btn-paste-source").addEventListener("click", pasteSource);
+  $("btn-select-source").addEventListener("click", () => selectTextIn(els.manual.hidden ? els.preview : els.manual));
+  $("btn-clean-source").addEventListener("click", cleanSource);
+  els.manual.addEventListener("input", updateSourceCount);
+  $("btn-suggest").addEventListener("click", () => (els.suggestMenu.hidden = !els.suggestMenu.hidden));
+  SUGGESTIONS.forEach((t) => {
+    const b = document.createElement("button");
+    b.className = "suggest-item";
+    b.textContent = t;
+    b.addEventListener("click", () => {
+      els.prompt.value = els.prompt.value.trim() ? els.prompt.value.trim() + " ; " + t : t;
+      els.suggestMenu.hidden = true;
+      els.prompt.focus();
+    });
+    els.suggestMenu.appendChild(b);
+  });
   $("btn-export-prompt").addEventListener("click", openExportPrompt);
   els.exportSource.addEventListener("change", buildExportPrompt);
   $("btn-export-copy").addEventListener("click", async () => { await copyText(els.exportText.value); toast("Prompt copié"); });
@@ -278,10 +303,11 @@ function start(inWord) {
   $("nav-next").addEventListener("click", () => navigate(-1));
   renderFavorites();
   updateDocsBadge();
-  updateNav();
+  updateModeHint();
+  if (!IN_WORD) $("keep-format-wrap").hidden = true;
   $("btn-history-clear").addEventListener("click", () => {
     try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
-    renderHistory(); exitBrowse();
+    browseIndex = -1; renderHistory(); els.browse.innerHTML = '<p class="hint">Aucun résultat pour l\'instant.</p>'; updateNav();
   });
 
   $("btn-settings").addEventListener("click", openSettings);
@@ -352,9 +378,15 @@ if (typeof Office !== "undefined" && Office.onReady) {
    5. LECTURE DU DOCUMENT WORD
 --------------------------------------------------------------------- */
 async function getSourceText() {
+  selectionKept = false;
   if (!IN_WORD || pastedSource) return els.manual.value.trim();
-  if (!els.wholeDoc.checked && !els.follow.checked && frozenSource !== null) return frozenSource;
-  return readWord();
+  if (els.wholeDoc.checked) return readWord();
+  if (!els.follow.checked && frozenSource !== null) return frozenSource;
+  const text = await readWord();
+  if (text) { lastSelection = text; return text; }
+  // Rien n'est sélectionné : on garde le dernier texte sélectionné
+  if (lastSelection) { selectionKept = true; return lastSelection; }
+  return "";
 }
 
 // Bouton « Coller » : met le contenu du presse-papiers dans le texte ciblé
@@ -387,40 +419,129 @@ async function readWord() {
 }
 
 async function refreshPreview() {
-  if (!IN_WORD) return;
+  if (!IN_WORD) { updateSourceCount(); return; }
+  if (pastedSource) { updateSourceCount(); return; }
   try {
     const text = await getSourceText();
     if (!text) {
       els.preview.className = "preview empty";
       els.preview.textContent = els.wholeDoc.checked ? "Le document est vide." : "Sélectionnez du texte dans Word…";
+      els.sourceCount.textContent = "";
       return;
     }
     els.preview.className = "preview";
-    els.preview.textContent = els.wholeDoc.checked ? "Tout le document" : text.slice(0, 280) + (text.length > 280 ? "…" : "");
-    const c = document.createElement("span");
-    c.className = "count";
-    const fige = !els.wholeDoc.checked && !els.follow.checked ? " · figé" : "";
-    c.textContent = countWords(text).toLocaleString("fr-FR") + " mots · " + text.length.toLocaleString("fr-FR") + " caractères" + fige;
-    els.preview.appendChild(c);
+    els.preview.textContent = els.wholeDoc.checked ? "Tout le document est ciblé." : text;
+    const etat = els.wholeDoc.checked ? "" : !els.follow.checked ? " · figé" : selectionKept ? " · sélection conservée" : "";
+    els.sourceCount.textContent = countWords(text).toLocaleString("fr-FR") + " mots · " + text.length.toLocaleString("fr-FR") + " caractères" + etat;
   } catch (e) {
     console.error(e);
   }
 }
 
+function updateSourceCount() {
+  if (els.manual.hidden) return;
+  const t = els.manual.value.trim();
+  els.sourceCount.textContent = t ? countWords(t).toLocaleString("fr-FR") + " mots · " + t.length.toLocaleString("fr-FR") + " caractères" : "";
+}
+
+// Sélectionne le texte affiché dans le panneau (pour le copier ou le retoucher)
+function selectTextIn(el) {
+  if (!el) return;
+  if (el.tagName === "TEXTAREA") { el.focus(); el.select(); return; }
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
+// Bouton « Nettoyer » : remet en forme un texte copié d'un PDF, sans IA
+function nettoyerTexte(t) {
+  return t
+    .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "")                       // caractères invisibles, césures
+    .replace(/\uFB00/g, "ff").replace(/\uFB01/g, "fi").replace(/\uFB02/g, "fl").replace(/\uFB03/g, "ffi").replace(/\uFB04/g, "ffl")
+    .replace(/[\u00A0\u2007\u202F\t]/g, " ")                              // espaces spéciales
+    .replace(/\r\n?/g, "\n")
+    .replace(/^[ ]*[•▪◦●■□➢►\uF0B7\uF0A7-][ ]+/gm, "- ")                   // puces variées → tiret
+    .replace(/([a-zàâäéèêëîïôöùûüç])-\n([a-zàâäéèêëîïôöùûüç])/g, "$1$2")  // mot coupé en fin de ligne
+    .replace(/([^.!?:;\n])\n(?!\n|- )([a-zàâäéèêëîïôöùûüç(])/g, "$1 $2") // phrase coupée en fin de ligne
+    .replace(/[ ]{2,}/g, " ")
+    .replace(/ +([,.])/g, "$1")
+    .replace(/^ +| +$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+async function cleanSource() {
+  const t = await safeGetSource();
+  if (!t) { toast("Aucun texte à nettoyer."); return; }
+  const propre = nettoyerTexte(t);
+  if (IN_WORD) {
+    pastedSource = true;
+    els.follow.checked = false;
+    els.preview.hidden = true;
+    els.manual.hidden = false;
+  }
+  els.manual.value = propre;
+  updateSourceCount();
+  toast(propre === t ? "Le texte était déjà propre" : "Texte nettoyé");
+}
+
 /* ---------------------------------------------------------------------
    6. ÉCRITURE DANS LE DOCUMENT WORD
 --------------------------------------------------------------------- */
+const aDuGras = (t) => /\*\*[^*]+\*\*/.test(t);
+const sansMarques = (t) => t.replace(/\*\*([^*]+)\*\*/g, "$1");
+function versHtml(t) {
+  const esc = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").split("\n").join("<br>");
+}
+
 async function wordReplace(text) {
   await Word.run(async (ctx) => {
-    ctx.document.getSelection().insertText(text, "Replace");
+    const sel = ctx.document.getSelection();
+    sel.load("text");
+    sel.font.load("name,size,color");
+    await ctx.sync();
+    if (!sel.text || !sel.text.trim()) {
+      throw new Error("Aucun texte n'est sélectionné dans Word. Sélectionnez de nouveau le passage, puis cliquez sur « Remplacer ».");
+    }
+    const original = sel.text;
+    const police = { name: sel.font.name, size: sel.font.size, color: sel.font.color };
+    const r = aDuGras(text) ? sel.insertHtml(versHtml(text), "Replace") : sel.insertText(text, "Replace");
+    if (els.keepFormat.checked) {
+      // Conserver la mise en forme : police, taille et couleur du passage d'origine
+      if (police.name) r.font.name = police.name;
+      if (police.size) r.font.size = police.size;
+      if (police.color) r.font.color = police.color;
+    }
+    ctx.trackedObjects.add(r);
+    await ctx.sync();
+    lastReplace = { range: r, original };
+  });
+}
+
+// Annule le dernier remplacement : remet le texte d'origine
+async function undoReplace() {
+  if (!lastReplace) throw new Error("Aucun remplacement à annuler.");
+  const { range, original } = lastReplace;
+  await Word.run(range, async (ctx) => {
+    range.insertText(original, "Replace");
+    ctx.trackedObjects.remove(range);
     await ctx.sync();
   });
+  lastReplace = null;
 }
 
 async function wordInsertAfter(text) {
   await Word.run(async (ctx) => {
     const lastParagraph = ctx.document.getSelection().paragraphs.getLast();
-    lastParagraph.insertParagraph(text, "After");
+    if (aDuGras(text)) {
+      const p = lastParagraph.insertParagraph("", "After");
+      p.insertHtml(versHtml(text), "Start");
+    } else {
+      lastParagraph.insertParagraph(text, "After");
+    }
     await ctx.sync();
   });
 }
@@ -430,7 +551,7 @@ async function wordComment(text) {
     throw new Error("Cette version de Word ne permet pas d'ajouter des commentaires depuis un complément.");
   }
   await Word.run(async (ctx) => {
-    ctx.document.getSelection().insertComment(text);
+    ctx.document.getSelection().insertComment(sansMarques(text));
     await ctx.sync();
   });
 }
@@ -441,7 +562,7 @@ async function wordComment(text) {
 // Bouton bleu : lance l'action choisie, ou la consigne libre
 async function launch() {
   if (controller) return;
-  if (browseIndex >= 0) exitBrowse();
+  els.suggestMenu.hidden = true;
   const extra = els.prompt.value.trim();
   if (selectedAction) {
     const action = selectedAction;
@@ -452,6 +573,15 @@ async function launch() {
   } else {
     toast("Choisissez une action, ou écrivez une consigne.");
   }
+  updateModeHint();
+}
+
+// Indique ce que fera la consigne écrite dans le champ
+function updateModeHint() {
+  if (!els.modeHint) return;
+  els.modeHint.textContent = selectedAction ? "précise l'action"
+    : history.length ? "Consigne : affine le dernier résultat"
+    : "Consigne : s'applique au texte ciblé";
 }
 
 function selectAction(action) {
@@ -460,6 +590,7 @@ function selectAction(action) {
   els.selPill.hidden = !action;
   els.selPill.textContent = action ? action.label + "  ×" : "";
   els.send.classList.toggle("ready", !!action);
+  updateModeHint();
 }
 
 async function runAction(action, extra) {
@@ -482,17 +613,29 @@ async function runAction(action, extra) {
   return true;
 }
 
-async function sendPrompt(question) {
+// Champ du bas sans action choisie : c'est toujours une consigne sur le texte, jamais une question
+async function sendPrompt(consigneUtilisateur) {
   const source = await safeGetSource();
   if (source === null) return;
-  // On joint le texte ciblé seulement s'il a changé depuis le dernier envoi
-  const attach = source && source !== lastSentSource;
-  if (attach) lastSentSource = source;
+  const suite = history.length && (!source || source === lastSentSource);
+  if (!suite && !source) {
+    toast(IN_WORD ? "Sélectionnez d'abord du texte dans Word." : "Collez d'abord un texte dans « Texte ciblé ».");
+    return;
+  }
   els.prompt.value = "";
-  const consigne = question + optionsConsigne();
-  const ref = docsContext(question + " " + (attach ? source : ""));
-  const content = (ref ? ref.text : "") + (attach ? buildMessage(consigne, source) : consigne);
-  await ask(content, question + (ref ? "\nDocuments : " + ref.label : ""), attach ? source.length : 0, "texte", attach ? source : lastSentSource, "Question");
+  const ref = docsContext(consigneUtilisateur + " " + (source || ""));
+  let content;
+  if (suite) {
+    content = "Consigne : " + consigneUtilisateur +
+      "\nApplique cette consigne au dernier texte que tu as produit et renvoie uniquement le texte modifié." + optionsConsigne();
+  } else {
+    newConversation();
+    lastSentSource = source;
+    content = buildMessage("Applique cette consigne au texte ci-dessous et renvoie uniquement le texte modifié. Consigne : " +
+      consigneUtilisateur + optionsConsigne(), source);
+  }
+  await ask((ref ? ref.text : "") + content, "Consigne : " + consigneUtilisateur + (ref ? "\nDocuments : " + ref.label : ""),
+    suite ? 0 : source.length, "texte", suite ? lastSentSource : source, "Consigne");
 }
 
 function buildMessage(consigne, source) {
@@ -514,10 +657,10 @@ async function safeGetSource() {
 
 function newConversation() { // Rédaction uniquement : la discussion du Chat documents n'est pas touchée
   stopGeneration();
-  if (browseIndex >= 0) exitBrowse();
   history = [];
   lastSentSource = null;
   els.chat.innerHTML = "";
+  updateModeHint();
 }
 
 async function ask(content, displayLabel, attachedChars, mode, source, historyLabel) {
@@ -543,10 +686,10 @@ async function ask(content, displayLabel, attachedChars, mode, source, historyLa
       // La 2e version est générée avec plus de créativité pour être différente
       await call(history, (chunk) => {
         raw += chunk;
-        bubble.body.textContent = withoutThinking(raw) || "Réflexion…";
+        bubble.body.textContent = sansMarques(withoutThinking(raw)) || "Réflexion…";
         scrollToBottom();
       }, controller.signal, v === 1 ? 0.4 : 0.9);
-      const answer = cleanText(withoutThinking(raw));
+      const answer = cleanText(withoutThinking(raw), content.includes("Mise en valeur :"));
       if (!answer) throw new Error("Le modèle n'a renvoyé aucun texte.");
       if (firstAnswer === null) firstAnswer = answer;
       showAnswer(bubble, answer, mode, source);
@@ -573,31 +716,40 @@ async function ask(content, displayLabel, attachedChars, mode, source, historyLa
   if (firstAnswer !== null) history.push({ role: "assistant", content: firstAnswer });
   else history.pop();
   setBusy(false);
+  updateModeHint();
   scrollToBottom();
+}
+
+// Affiche un texte avec ses mots en gras (**…**)
+function setRich(el, text) {
+  el.textContent = "";
+  text.split(/(\*\*[^*]+\*\*)/).forEach((part) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    if (m) { const b = document.createElement("strong"); b.textContent = m[1]; el.appendChild(b); }
+    else if (part) el.appendChild(document.createTextNode(part));
+  });
 }
 
 function showAnswer(bubble, answer, mode, source) {
   if (mode === "coherence" && /^aucune incoh[eé]rence/i.test(answer.trim())) {
     bubble.root.classList.add("ok");
     bubble.body.textContent = "Texte cohérent — aucune incohérence trouvée.";
-    updateNav();
     return;
   }
   if (mode === "coherence") mode = "explication";
   if (mode === "correction" && source) {
     showCorrection(bubble, source, answer);
   } else {
-    bubble.body.textContent = answer;
+    setRich(bubble.body, answer);
     addTools(bubble, answer, mode);
   }
-  checkProtectedTerms(bubble, source, answer);
+  checkProtectedTerms(bubble, source, sansMarques(answer));
   if (source && !/^(phrase|texte) correct/i.test(answer) && mode !== "explication") {
     const wc = document.createElement("div");
     wc.className = "wc";
-    wc.textContent = "Mots : " + countWords(source) + " → " + countWords(answer);
+    wc.textContent = "Mots : " + countWords(source) + " → " + countWords(sansMarques(answer));
     bubble.root.insertBefore(wc, bubble.body.nextSibling);
   }
-  updateNav();
 }
 
 function countWords(t) {
@@ -631,7 +783,8 @@ function systemPrompt() {
     "- Écris en texte brut, sans Markdown : pas de **, pas de #, pas de tableau. Pour une liste, utilise des tirets « - ».",
     "- Garde la langue du texte d'origine, sauf demande de traduction.",
     "- Conserve la structure (paragraphes, listes) sauf si la consigne demande de la changer.",
-    "- Pour une explication ou une question, réponds de façon claire, structurée et concise.",
+    "- Va droit au but : aucune introduction, aucune conclusion, aucune phrase de politesse ni de transition inutile.",
+    "- Une explication est brève : au plus aussi longue que le texte expliqué, idéalement plus courte.",
     "",
     "Fiabilité technique :",
     "- N'invente jamais de chiffres, de dimensions, de normes, de références réglementaires, de noms de lieux ni de faits absents du texte.",
@@ -668,11 +821,12 @@ function optionsConsigne() {
   one(FORMES, options.forme, "Forme");
   one(LONGUEURS, options.longueur, "Longueur");
   one(DESTINATAIRES, options.destinataire, "Destinataire : adapte le texte pour");
+  if (options.valeur) parts.push("Mise en valeur : encadre avec ** seulement 3 à 5 mots-clés ou chiffres importants (exemple : **50 m**). N'utilise aucune autre mise en forme.");
   return parts.length ? "\n\n" + parts.join("\n\n") : "";
 }
 
 function optionsResume() {
-  return options.tons.concat(options.domaines, [options.forme, options.longueur, options.destinataire].filter(Boolean)).join(", ");
+  return options.tons.concat(options.domaines, [options.forme, options.longueur, options.destinataire, options.valeur ? "Mise en valeur" : ""].filter(Boolean)).join(", ");
 }
 
 /* ---------------------------------------------------------------------
@@ -917,7 +1071,9 @@ function addTools(bubble, text, mode) {
       try { await fn(); } catch (e) { showError(e.message); }
     });
     bar.appendChild(b);
+    return b;
   };
+  const plain = sansMarques(text);
   if (IN_WORD) {
     if (mode === "chat") {
       add("Insérer dans Word", async () => { await wordInsertAfter(text); toast("Texte inséré"); }, true);
@@ -926,12 +1082,21 @@ function addTools(bubble, text, mode) {
       add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); }, true);
       add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
     } else {
-      add("Remplacer la sélection", async () => { await wordReplace(text); toast("Sélection remplacée"); }, true);
+      add("Remplacer la sélection", async () => {
+        await wordReplace(text);
+        toast("Sélection remplacée");
+        // Bouton « Annuler » : remet le texte d'origine dans Word
+        document.querySelectorAll(".tool.undo").forEach((x) => x.remove());
+        const u = add("Annuler", async () => { await undoReplace(); u.remove(); toast("Texte d'origine rétabli"); });
+        u.classList.add("undo");
+        bar.insertBefore(u, bar.children[1]);
+      }, true);
       add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
       add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); });
     }
   }
-  add("Copier", async () => { await copyText(text); toast("Copié"); }, !IN_WORD);
+  add("Copier", async () => { await copyText(plain); toast("Copié"); }, !IN_WORD);
+  add("Sélectionner", async () => selectTextIn(bubble.body));
   bubble.root.appendChild(bar);
 }
 
@@ -958,7 +1123,7 @@ function updateBadge() {
 }
 
 function scrollToBottom() {
-  els.main.scrollTop = els.main.scrollHeight;
+  els.chat.scrollTop = els.chat.scrollHeight;
 }
 
 let toastTimer;
@@ -1055,7 +1220,7 @@ async function downloadManifest() {
    TONS : affichage et mémorisation
 --------------------------------------------------------------------- */
 function loadOptions() {
-  const d = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "" };
+  const d = { tons: [], domaines: [], forme: "", longueur: "", destinataire: "", valeur: false };
   try { return sanitizeOptions(Object.assign(d, JSON.parse(localStorage.getItem(OPTIONS_KEY) || "{}"))); } catch (_) { return d; }
 }
 
@@ -1071,7 +1236,7 @@ function sanitizeOptions(o) {
   });
   const domaines = (o.domaines || []).filter((x) => DOMAINES.some((d) => d.label === x));
   const dest = DESTINATAIRES.some((d) => d.label === o.destinataire) ? o.destinataire : "";
-  return { tons: kept, domaines, forme: o.forme || "", longueur: o.longueur || "", destinataire: dest };
+  return { tons: kept, domaines, forme: o.forme || "", longueur: o.longueur || "", destinataire: dest, valeur: !!o.valeur };
 }
 function saveOptions() {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
@@ -1129,6 +1294,11 @@ function renderOptions() {
         }, !!controller));
       });
     });
+  els.valeur.innerHTML = "";
+  els.valeur.appendChild(chip("Mise en valeur", options.valeur, "Met en gras quelques mots-clés et chiffres importants", () => {
+    options.valeur = !options.valeur;
+    saveOptions(); renderOptions();
+  }, !!controller));
   const r = optionsResume();
   els.optionsSummary.textContent = r ? "· " + r : "· aucun";
   $("btn-options-clear").hidden = !r;
@@ -1149,52 +1319,51 @@ function saveToHistory(label, answer, mode, source) {
 }
 
 function openHistory() {
+  const list = loadHistory();
+  browseIndex = list.length ? 0 : -1;
   renderHistory();
+  if (list.length) showBrowse(list[0], true);
+  else els.browse.innerHTML = '<p class="hint">Aucun résultat pour l\'instant.</p>';
+  updateNav();
   showPanel(els.historyPanel);
 }
 
 function renderHistory() {
   const list = loadHistory();
   els.historyList.innerHTML = "";
-  if (!list.length) {
-    els.historyList.innerHTML = '<p class="hint">Aucun résultat pour l\'instant.</p>';
-    return;
-  }
-  list.forEach((h) => {
+  list.forEach((h, idx) => {
     const item = document.createElement("div");
-    item.className = "hist-item";
+    item.className = "hist-item" + (idx === browseIndex ? " active" : "");
     const head = document.createElement("div");
     head.className = "hist-head";
     const d = new Date(h.date);
     head.textContent = h.label + " — " + d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     const body = document.createElement("div");
     body.className = "hist-body";
-    body.textContent = h.answer;
+    body.textContent = sansMarques(h.answer);
     item.append(head, body);
     item.addEventListener("click", () => {
-      if (item.classList.contains("open")) return;
-      item.classList.add("open");
-      const bubble = { root: item, body };
-      addTools(bubble, h.answer, h.mode === "explication" ? "explication" : "texte");
+      browseIndex = idx;
+      showBrowse(h, idx === 0);
+      updateNav();
+      renderHistory();
+      els.historyPanel.scrollTop = 0;
     });
     els.historyList.appendChild(item);
   });
 }
 
 /* ---------------------------------------------------------------------
-   NAVIGATION ← → : texte de départ et résultat, toujours ensemble
+   NAVIGATION ← → (panneau Historique) : texte de départ et résultat ensemble
 --------------------------------------------------------------------- */
 function updateNav() {
   const list = loadHistory();
-  els.navBar.hidden = !list.length;
   if (browseIndex >= list.length) browseIndex = list.length - 1;
-  $("nav-prev").disabled = !!controller || browseIndex >= list.length - 1;
-  $("nav-next").disabled = !!controller || browseIndex < 0;
-  els.navPos.textContent = browseIndex < 0
-    ? "Historique · " + list.length + " résultat" + (list.length > 1 ? "s" : "")
-    : browseIndex === 0
-      ? "Résultat actuel · " + list.length + " / " + list.length
-      : "Ancien résultat · " + (list.length - browseIndex) + " / " + list.length;
+  $("nav-prev").disabled = !!controller || browseIndex < 0 || browseIndex >= list.length - 1;
+  $("nav-next").disabled = !!controller || browseIndex <= 0;
+  els.navPos.textContent = !list.length ? "Aucun résultat"
+    : browseIndex === 0 ? "Résultat actuel · " + list.length + " / " + list.length
+    : "Ancien résultat · " + (list.length - browseIndex) + " / " + list.length;
   els.navBar.classList.toggle("old", browseIndex > 0);
 }
 
@@ -1202,29 +1371,19 @@ function updateNav() {
 function navigate(step) {
   const list = loadHistory();
   const next = browseIndex + step;
-  if (next < 0) return exitBrowse();
-  if (next >= list.length) return;
+  if (next < 0 || next >= list.length) return;
   browseIndex = next;
   showBrowse(list[browseIndex], browseIndex === 0);
   updateNav();
-}
-
-function exitBrowse() {
-  browseIndex = -1;
-  els.browse.hidden = true;
-  els.chat.hidden = false;
-  updateNav();
+  renderHistory();
 }
 
 function showBrowse(h, isCurrent) {
-  els.chat.hidden = true;
-  els.browse.hidden = false;
   els.browse.innerHTML = "";
   els.browse.className = "browse " + (isCurrent ? "current" : "old");
   const d = new Date(h.date);
   const head = document.createElement("div");
   head.className = "hist-head";
-  head.innerHTML = "";
   const tag = document.createElement("span");
   tag.className = "state-tag";
   tag.textContent = isCurrent ? "Actuel" : "Ancien";
@@ -1244,7 +1403,11 @@ function showBrowse(h, isCurrent) {
   cp.className = "tool";
   cp.textContent = "Copier";
   cp.addEventListener("click", async () => { await copyText(h.source || ""); toast("Texte de départ copié"); });
-  sbar.appendChild(cp);
+  const sl = document.createElement("button");
+  sl.className = "tool";
+  sl.textContent = "Sélectionner";
+  sl.addEventListener("click", () => selectTextIn(sb));
+  sbar.append(cp, sl);
   src.append(st, sb, sbar);
 
   const res = document.createElement("div");
@@ -1254,15 +1417,15 @@ function showBrowse(h, isCurrent) {
   rt.textContent = "Résultat";
   const rb = document.createElement("div");
   rb.className = "body";
-  rb.textContent = h.answer;
+  setRich(rb, h.answer);
   res.append(rt, rb);
-  if (h.source) {
+  if (h.source && h.mode !== "explication" && h.mode !== "coherence") {
     const wc = document.createElement("div");
     wc.className = "wc";
-    wc.textContent = "Mots : " + countWords(h.source) + " → " + countWords(h.answer);
+    wc.textContent = "Mots : " + countWords(h.source) + " → " + countWords(sansMarques(h.answer));
     res.appendChild(wc);
   }
-  addTools({ root: res, body: rb }, h.answer, h.mode === "explication" ? "explication" : "texte");
+  addTools({ root: res, body: rb }, h.answer, h.mode === "explication" || h.mode === "coherence" ? "explication" : "texte");
   els.browse.append(head, src, res);
 }
 
@@ -1299,7 +1462,7 @@ function renderFavorites() {
   const list = loadFavorites();
   els.favList.innerHTML = "";
   if (!list.length) {
-    els.favList.innerHTML = '<span class="muted">Aucun favori. Choisissez une action et des réglages, puis « Enregistrer ».</span>';
+    els.favList.innerHTML = '<span class="muted" title="Choisissez une action et des réglages, puis « Enregistrer »">aucun</span>';
     return;
   }
   list.forEach((f) => {
@@ -1559,7 +1722,8 @@ function chatSystemPrompt() {
     "Tu es l'assistant documentaire d'un ingénieur routier et VRD, dans un panneau de Microsoft Word. Tu réponds à ses questions en t'appuyant sur les extraits de documents fournis ci-dessous (CCTP, RC, CCAP, rapports…).",
     "",
     "Règles :",
-    "- Réponds en français, de façon claire et structurée. Texte brut, sans Markdown (pas de **, pas de #) ; utilise des tirets « - » pour les listes.",
+    "- Réponds en français, bref et précis : va droit au but, sans introduction, sans conclusion ni formule de politesse. Texte brut, sans Markdown (pas de **, pas de #) ; utilise des tirets « - » pour les listes.",
+    "- Une explication reste courte : quelques lignes suffisent le plus souvent.",
     "- Pour chaque information tirée des documents, cite la source entre crochets, par exemple [CCTP.pdf, p. 12].",
     "- Si l'information ne figure pas dans les extraits, dis-le clairement (« Je ne trouve pas cette information dans les documents joints. »). Tu peux ensuite donner une réponse générale en précisant qu'elle ne vient pas des documents.",
     "- N'invente jamais de chiffres, de dates, de montants, de normes ni de références.",
@@ -1638,7 +1802,7 @@ function chatBubble(cls, text) {
   body.textContent = text;
   root.appendChild(body);
   els.dchat.appendChild(root);
-  els.chatMain.scrollTop = els.chatMain.scrollHeight;
+  els.dchat.scrollTop = els.dchat.scrollHeight;
   return { root, body };
 }
 
@@ -1680,7 +1844,7 @@ async function chatSend() {
     await call(chatHistory, (t) => {
       raw += t;
       bubble.body.textContent = withoutThinking(raw) || "Réflexion…";
-      els.chatMain.scrollTop = els.chatMain.scrollHeight;
+      els.dchat.scrollTop = els.dchat.scrollHeight;
     }, controller.signal, 0.3, chatSystemPrompt());
     const answer = cleanText(withoutThinking(raw));
     if (!answer) throw new Error("Le modèle n'a renvoyé aucun texte.");
@@ -1707,7 +1871,7 @@ async function chatSend() {
   } finally {
     if (bubble) bubble.body.classList.remove("streaming");
     setBusy(false);
-    els.chatMain.scrollTop = els.chatMain.scrollHeight;
+    els.dchat.scrollTop = els.dchat.scrollHeight;
   }
 }
 
@@ -1842,9 +2006,9 @@ function withoutThinking(t) {
 }
 
 // Retire le Markdown que l'IA ajouterait malgré la consigne
-function cleanText(t) {
+function cleanText(t, garderGras) {
+  if (!garderGras) t = t.replace(/\*\*(.+?)\*\*/g, "$1");
   return t
-    .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^\s*[*•]\s+/gm, "- ")
     .trim();

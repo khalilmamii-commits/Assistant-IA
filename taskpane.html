@@ -129,7 +129,13 @@
   <!-- HISTORIQUE -->
   <section id="history-panel" class="settings" hidden>
     <h2>Historique des résultats</h2>
-    <p class="hint">Les 30 derniers résultats, enregistrés sur cet ordinateur. Cliquez sur un résultat pour le réutiliser.</p>
+    <div id="nav-bar" class="nav-bar">
+      <button id="nav-prev" class="nav-btn" title="Résultat précédent"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <span id="nav-pos"></span>
+      <button id="nav-next" class="nav-btn" title="Résultat suivant"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    </div>
+    <section id="browse" class="browse"></section>
+    <div class="section-head"><span class="section-title">Tous les résultats</span><span class="muted">30 derniers, sur cet ordinateur</span></div>
     <div id="history-list" class="history-list"></div>
     <div class="row">
       <button id="btn-history-close" class="primary">Fermer</button>
@@ -137,86 +143,86 @@
     </div>
   </section>
 
-  <!-- ZONE PRINCIPALE -->
-  <main id="main" class="main">
+  <!-- ZONE PRINCIPALE : fenêtre fixe, seuls le texte ciblé et le résultat défilent -->
+  <main id="main" class="main fixed">
 
     <div id="browser-banner" class="banner" hidden>
-      <strong>Mode test hors de Word.</strong> Collez un texte dans « Texte ciblé » pour essayer.
-      <button id="btn-manifest" class="primary manifest-btn" hidden>Télécharger le manifeste pour Word</button>
+      <strong>Mode test hors de Word.</strong>
+      <button id="btn-manifest" class="link-btn" hidden>Télécharger le manifeste</button>
     </div>
 
-    <section class="favs">
-      <div class="section-head">
+    <div class="top-zone">
+      <section class="favs">
         <span class="section-title">Favoris</span>
-        <button id="btn-fav-add" class="link-btn">+ Enregistrer les réglages actuels</button>
-      </div>
+        <div id="fav-list" class="chips inline"></div>
+        <button id="btn-fav-add" class="link-btn" title="Enregistrer l'action et les réglages actuels">+ Enregistrer</button>
+      </section>
       <div id="fav-form" class="fav-form" hidden>
         <input id="fav-name" placeholder="Nom du favori, ex. Rapport MOA" maxlength="40">
         <button id="btn-fav-ok" class="primary">OK</button>
         <button id="btn-fav-cancel" class="ghost">Annuler</button>
       </div>
-      <div id="fav-list" class="chips"></div>
-    </section>
 
-    <details id="options-box" class="options-box" open>
-      <summary><span class="section-title">Réglages du texte</span> <span id="options-summary" class="muted"></span></summary>
+      <details id="options-box" class="options-box">
+        <summary><span class="section-title">Réglages</span> <span id="options-summary" class="muted"></span>
+          <button id="btn-options-clear" class="link-btn" hidden>Effacer</button></summary>
 
-      <div class="section-head">
-        <span class="section-title small">Ton</span>
-        <span class="muted">plusieurs choix</span>
-        <button id="btn-options-clear" class="link-btn" hidden>Tout effacer</button>
+        <div class="grp grp-ton">
+          <div class="grp-title">Ton</div>
+          <div id="tons" class="chips"></div>
+        </div>
+        <div class="grp grp-dom">
+          <div class="grp-title">Domaine d'activité</div>
+          <div id="opt-domaines" class="chips"></div>
+        </div>
+        <div class="grp grp-forme">
+          <div class="grp-title">Forme</div>
+          <div id="opt-forme" class="chips"></div>
+          <div class="grp-title sub">Longueur</div>
+          <div id="opt-longueur" class="chips"></div>
+          <div class="grp-title sub">Option</div>
+          <div id="opt-valeur" class="chips"></div>
+        </div>
+        <div class="grp grp-dest">
+          <div class="grp-title">Destinataire</div>
+          <div id="opt-destinataire" class="chips"></div>
+        </div>
+      </details>
+
+      <div class="grp grp-act">
+        <div class="grp-title">Actions</div>
+        <section id="actions" class="actions flow"></section>
+        <div class="grp-title sub">Rédiger en style</div>
+        <section id="styles" class="actions flow"></section>
       </div>
-      <div id="tons" class="chips"></div>
-
-      <div class="section-head"><span class="section-title small">Domaine d'activité</span><span class="muted">plusieurs choix</span></div>
-      <div id="opt-domaines" class="chips"></div>
-
-      <div class="section-head"><span class="section-title small">Forme</span></div>
-      <div id="opt-forme" class="chips"></div>
-
-      <div class="section-head"><span class="section-title small">Longueur</span></div>
-      <div id="opt-longueur" class="chips"></div>
-
-      <div class="section-head"><span class="section-title small">Destinataire</span></div>
-      <div id="opt-destinataire" class="chips"></div>
-    </details>
-
-    <div class="section-head"><span class="section-title">Actions</span><span class="muted">choisissez, puis lancez</span></div>
-    <section id="actions" class="actions"></section>
-
-    <div class="section-head"><span class="section-title">Rédiger en style</span></div>
-    <section id="styles" class="actions"></section>
+    </div>
 
     <section class="card source">
       <div class="source-head">
         <span class="source-title">Texte ciblé</span>
-        <label class="toggle"><input type="checkbox" id="whole-doc"> Tout le document</label>
-      </div>
-      <div class="source-tools">
-        <label class="switch" id="follow-wrap" title="Activé : la sélection Word est reprise automatiquement. Désactivé : le texte reste figé.">
-          <input type="checkbox" id="follow-sel" checked><span class="slider"></span> Suivre la sélection Word
-        </label>
         <span class="src-btns">
           <button id="btn-paste-source" class="link-btn">Coller</button>
           <button id="btn-copy-source" class="link-btn">Copier</button>
+          <button id="btn-select-source" class="link-btn">Sélectionner</button>
+          <button id="btn-clean-source" class="link-btn" title="Retire espaces en trop, coupures de ligne et caractères parasites (sans IA)">Nettoyer</button>
         </span>
       </div>
+      <div class="source-tools">
+        <label class="switch" id="follow-wrap" title="Activé : la sélection Word est reprise automatiquement. Désactivé : le texte reste figé.">
+          <input type="checkbox" id="follow-sel" checked><span class="slider"></span> Suivre la sélection
+        </label>
+        <label class="toggle"><input type="checkbox" id="whole-doc"> Tout le document</label>
+      </div>
       <div id="selection-preview" class="preview empty">Sélectionnez du texte dans Word…</div>
-      <textarea id="manual-text" rows="4" placeholder="Collez votre texte ici" hidden></textarea>
+      <textarea id="manual-text" rows="3" placeholder="Collez votre texte ici" hidden></textarea>
+      <div id="source-count" class="count"></div>
     </section>
 
-    <div id="nav-bar" class="nav-bar" hidden>
-      <button id="nav-prev" class="nav-btn" title="Résultat précédent"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-      <span id="nav-pos"></span>
-      <button id="nav-next" class="nav-btn" title="Résultat suivant"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
-    </div>
-    <section id="browse" class="browse" hidden></section>
-
-    <section id="chat" class="chat"></section>
+    <section id="chat" class="chat result-zone"></section>
   </main>
 
   <!-- ONGLET CHAT DOCUMENTS -->
-  <main id="chat-main" class="main" hidden>
+  <main id="chat-main" class="main fixed" hidden>
     <section class="card">
       <div class="source-head">
         <span class="source-title">Documents joints</span>
@@ -224,7 +230,7 @@
       </div>
       <div id="chat-docs" class="chat-docs"></div>
     </section>
-    <section id="dchat" class="chat"></section>
+    <section id="dchat" class="chat result-zone"></section>
   </main>
 
   <footer id="composer-chat" class="composer-wrap" hidden>
@@ -240,16 +246,18 @@
   <footer id="composer-redac" class="composer-wrap">
     <div class="composer-bar">
       <span id="sel-pill" class="sel-pill" hidden></span>
-      <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents de référence">
-        <input type="checkbox" id="use-docs" checked> Documents
-      </label>
-      <label class="toggle two-versions" title="L'IA propose deux versions différentes pour choisir la meilleure (deux fois plus long)">
-        <input type="checkbox" id="two-versions"> 2 versions
-      </label>
+      <span id="mode-hint" class="muted"></span>
+      <button id="btn-suggest" class="link-btn suggest-btn">Suggestions</button>
     </div>
+    <div id="suggest-menu" class="suggest-menu" hidden></div>
     <div class="composer">
-      <textarea id="prompt" rows="2" placeholder="Une question ou une consigne…"></textarea>
+      <textarea id="prompt" rows="2" placeholder="Une consigne pour affiner le texte…"></textarea>
       <button id="btn-send" class="primary send" title="Lancer"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="composer-opts">
+      <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents de référence"><input type="checkbox" id="use-docs" checked> Documents</label>
+      <label class="toggle" title="L'IA propose deux versions différentes (deux fois plus long)"><input type="checkbox" id="two-versions"> 2 versions</label>
+      <label class="toggle" id="keep-format-wrap" title="Le texte remplacé garde la police, la taille et la couleur du passage d'origine"><input type="checkbox" id="keep-format" checked> Conserver la mise en forme</label>
     </div>
   </footer>
 
