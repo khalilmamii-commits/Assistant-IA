@@ -15,20 +15,26 @@
    mode "explication" → résultat à lire (proposé en commentaire Word)
 --------------------------------------------------------------------- */
 const ACTIONS = [
-  // --- Actions sur le texte ---
-  { label: "Reformuler", mode: "texte",
-    consigne: "Reformule ce texte pour le rendre plus clair et plus fluide. Garde le sens, le niveau de détail et le registre." },
-  { label: "Corriger", mode: "correction", tons: false,
+  // --- Actions sur le texte, regroupées par famille ---
+  { famille: "Contrôle", label: "Corriger", mode: "correction", tons: false,
     consigne: "Corrige l'orthographe, la grammaire, la ponctuation, les accords et la typographie française de ce texte (espaces avant ; : ! ?, majuscules accentuées). Ne change ni le style, ni les mots, ni le contenu : modifie uniquement les fautes. Si le texte ne contient aucune faute, réponds uniquement : Phrase correcte." },
-  { label: "Plus concis", mode: "texte",
+  { famille: "Contrôle", label: "Vérifier la cohérence", mode: "coherence", tons: false,
+    consigne: "Vérifie la cohérence interne de ce texte : chiffres, unités, dimensions, quantités, références, noms, lieux et dates qui se contredisent ou ne concordent pas. Ne modifie pas le texte. Liste chaque incohérence sur une ligne commençant par un tiret, en citant les passages concernés. Si tout est cohérent, réponds uniquement : Aucune incohérence trouvée." },
+  { famille: "Réécriture", label: "Reformuler", mode: "texte",
+    consigne: "Reformule ce texte pour le rendre plus clair et plus fluide. Garde le sens, le niveau de détail et le registre." },
+  { famille: "Réécriture", label: "Structurer", mode: "texte",
+    consigne: "Réorganise ce texte dans un ordre logique et découpe-le en paragraphes précédés de courts intertitres. Garde autant que possible les phrases d'origine : ne change pas le contenu." },
+  { famille: "Réécriture", label: "Argumenter", mode: "texte",
+    consigne: "Renforce l'argumentation de ce texte : développe le pourquoi de chaque choix et ajoute des justifications techniques. N'invente aucun fait, aucun chiffre ni aucune référence : si une preuve manque, écris [à compléter]." },
+  { famille: "Longueur", label: "Plus concis", mode: "texte",
     consigne: "Rends ce texte plus concis (environ un tiers plus court) sans perdre d'information importante." },
-  { label: "Développer", mode: "texte",
-    consigne: "Développe ce texte avec des transitions et une rédaction plus complète. N'invente aucun chiffre, aucune norme, aucune référence ni aucun fait absent du texte : si une précision manque, écris [à compléter]." },
-  { label: "Résumer", mode: "texte",
+  { famille: "Longueur", label: "Résumer", mode: "texte",
     consigne: "Résume ce texte en quelques phrases. Utilise des tirets si une liste est plus lisible." },
-  { label: "Expliquer", mode: "explication",
+  { famille: "Longueur", label: "Développer", mode: "texte",
+    consigne: "Développe ce texte avec des transitions et une rédaction plus complète. N'invente aucun chiffre, aucune norme, aucune référence ni aucun fait absent du texte : si une précision manque, écris [à compléter]." },
+  { famille: "Compréhension", label: "Expliquer", mode: "explication",
     consigne: "Explique ce texte simplement : de quoi il s'agit, le sens des termes techniques et les points à retenir." },
-  { label: "Traduire (EN)", mode: "texte",
+  { famille: "Compréhension", label: "Traduire (EN)", mode: "texte",
     consigne: "Traduis ce texte en anglais professionnel." },
 
   // --- Styles de document ---
@@ -38,10 +44,10 @@ const ACTIONS = [
     consigne: "Réécris ce texte dans le style d'une notice explicative : descriptive et concise. Explique ce qui est prévu (dispositions, matériaux, fonctionnement), sans argumenter." },
   { label: "Appel d'offres", mode: "texte", groupe: "style",
     consigne: "Réécris ce texte dans le style d'une réponse à un appel d'offres (mémoire technique) : précis, engagé et vérifiable. Mets en avant la méthodologie, les moyens et les engagements du candidat, avec des formulations comme « Nous proposons… », « Notre équipe assurera… », « Le candidat s'engage à… »." },
-  { label: "Mail", mode: "texte", groupe: "style",
-    consigne: "Transforme ce texte en e-mail professionnel : courtois, clair et structuré (formule d'appel, objet en une phrase, demande ou information, formule de politesse)." },
   { label: "Compte rendu", mode: "texte", groupe: "style",
     consigne: "Réécris ce texte sous forme de compte rendu : factuel et structuré, avec l'objet, les participants s'ils sont mentionnés, les points abordés, les décisions prises et les actions à mener (qui, quoi, quand). N'invente aucun participant, aucune date ni aucune décision : écris [à compléter] si une information manque." },
+  { label: "Mail", mode: "texte", groupe: "style",
+    consigne: "Transforme ce texte en e-mail professionnel : courtois, clair et structuré (formule d'appel, objet en une phrase, demande ou information, formule de politesse)." },
   { label: "Présentation", mode: "texte", groupe: "style",
     consigne: "Réécris ce texte dans le style d'une présentation PowerPoint : phrases courtes et percutantes, centrées sur les mots-clés, prêtes à être collées dans une diapositive. Ne crée pas de diapositives complètes : transforme seulement ce texte." },
 ];
@@ -50,20 +56,28 @@ const ACTIONS = [
    TONS À COCHER — s'appliquent à toutes les actions sauf « Corriger »
 --------------------------------------------------------------------- */
 const TONS = [
-  { label: "Formel",       consigne: "registre soutenu, vouvoiement, phrases complètes" },
-  { label: "Informel",     consigne: "ton direct et simple, tout en restant professionnel" },
-  { label: "Familier",     consigne: "ton oral et détendu" },
-  { label: "Informatif",   consigne: "factuel, centré sur l'information utile" },
-  { label: "Neutre",       consigne: "aucun jugement ni émotion" },
-  { label: "Optimiste",    consigne: "rassurant, met en avant les points positifs et les solutions" },
-  { label: "Pessimiste",   consigne: "met en avant les risques, les limites et les points de vigilance" },
-  { label: "Prudent",      consigne: "formulations nuancées, réserves explicites (« sous réserve de… », « il conviendra de vérifier… »)" },
-  { label: "Persuasif",    consigne: "argumente pour convaincre un maître d'ouvrage ou un jury" },
-  { label: "Synthétique",  consigne: "va à l'essentiel, phrases courtes" },
-  { label: "Pédagogique",  consigne: "explique simplement, définit les termes techniques" },
-  { label: "Précis",       consigne: "vocabulaire exact, chiffres et références conservés, aucune formulation vague" },
-  { label: "Technique",    consigne: "vocabulaire du métier, explication détaillée des solutions et des choix techniques" },
+  // Registre
+  { groupe: "Registre", label: "Formel",       consigne: "registre soutenu, vouvoiement, phrases complètes" },
+  { groupe: "Registre", label: "Informel",     consigne: "ton direct et simple, tout en restant professionnel" },
+  { groupe: "Registre", label: "Familier",     consigne: "ton oral et détendu" },
+  // Rigueur
+  { groupe: "Rigueur", label: "Neutre",        consigne: "aucun jugement ni émotion" },
+  { groupe: "Rigueur", label: "Informatif",    consigne: "factuel, centré sur l'information utile" },
+  { groupe: "Rigueur", label: "Précis",        consigne: "vocabulaire exact, chiffres et références conservés, aucune formulation vague" },
+  { groupe: "Rigueur", label: "Technique",     consigne: "vocabulaire du métier, explication détaillée des solutions et des choix techniques" },
+  // Attitude
+  { groupe: "Attitude", label: "Optimiste",    consigne: "rassurant, met en avant les points positifs et les solutions" },
+  { groupe: "Attitude", label: "Enthousiaste", consigne: "dynamique et engagé, valorise le projet et la démarche, sans exagération ni promesse non tenable" },
+  { groupe: "Attitude", label: "Pessimiste",   consigne: "met en avant les risques, les limites et les points de vigilance" },
+  { groupe: "Attitude", label: "Critique",     consigne: "met en évidence les faiblesses, les limites et les points à améliorer, de façon argumentée et constructive" },
+  { groupe: "Attitude", label: "Prudent",      consigne: "formulations nuancées, réserves explicites (« sous réserve de… », « il conviendra de vérifier… »)" },
+  { groupe: "Attitude", label: "Convaincant",  consigne: "s'appuie sur des preuves et une logique solide pour convaincre un maître d'ouvrage ou un jury, de façon factuelle" },
+  // Lecture
+  { groupe: "Lecture", label: "Synthétique",   consigne: "va à l'essentiel, phrases courtes" },
+  { groupe: "Lecture", label: "Pédagogique",   consigne: "explique simplement, définit les termes techniques" },
 ];
+// Anciens noms (réglages et favoris déjà enregistrés)
+const RENOMMAGES = { "Persuasif": "Convaincant", "Réseaux secs": "Réseaux", "Collègue technique": "Expert technique" };
 
 /* Tons contraires : quand l'un est coché, les autres sont grisés */
 const TONS_EXCLUSIFS = [
@@ -71,7 +85,9 @@ const TONS_EXCLUSIFS = [
   ["Optimiste", "Pessimiste"],
   ["Synthétique", "Pédagogique"],
   ["Technique", "Familier"],
-  ["Neutre", "Optimiste"], ["Neutre", "Pessimiste"], ["Neutre", "Persuasif"],
+  ["Neutre", "Optimiste"], ["Neutre", "Pessimiste"], ["Neutre", "Convaincant"], ["Neutre", "Enthousiaste"],
+  ["Enthousiaste", "Pessimiste"],
+  ["Critique", "Enthousiaste"], ["Critique", "Optimiste"],
 ];
 function tonsIncompatibles(label) {
   const out = new Set();
@@ -89,7 +105,7 @@ const DOMAINES = [
   { label: "Environnement",      consigne: "impacts, milieux naturels, nuisances, déchets, réglementation environnementale" },
   { label: "Hydraulique",        consigne: "écoulements, bassins versants, débits, dimensionnement d'ouvrages hydrauliques" },
   { label: "Trafic",             consigne: "comptages, capacité, carrefours, études de circulation" },
-  { label: "Réseaux secs",       consigne: "éclairage public, télécommunications, électricité, signalisation lumineuse" },
+  { label: "Réseaux",            consigne: "éclairage public, télécommunications, électricité, signalisation lumineuse" },
   { label: "Travaux",            consigne: "phasage, exploitation sous circulation, sécurité de chantier, délais, suivi d'exécution" },
 ];
 
@@ -105,10 +121,10 @@ const LONGUEURS = [
   { label: "Plus long",  consigne: "plus développé que le texte d'origine, sans inventer de faits" },
 ];
 const DESTINATAIRES = [
-  { label: "Maître d'ouvrage",   consigne: "un maître d'ouvrage : clair, orienté décisions, coûts, délais et risques" },
-  { label: "Élus",               consigne: "des élus : accessible, orienté enjeux pour le territoire et les usagers, peu de jargon" },
-  { label: "Grand public",       consigne: "le grand public : simple, sans jargon, termes techniques expliqués" },
-  { label: "Collègue technique", consigne: "un collègue ingénieur : technique, précis, vocabulaire du métier" },
+  { label: "Maître d'ouvrage", consigne: "un maître d'ouvrage : clair, orienté décisions, coûts, délais et risques" },
+  { label: "Élus",             consigne: "des élus : court, accessible, orienté enjeux pour le territoire et les usagers, peu de jargon" },
+  { label: "Grand public",     consigne: "le grand public : simple, sans jargon, termes techniques expliqués" },
+  { label: "Expert technique", consigne: "un expert technique : précis, vocabulaire du métier, justifications et références détaillées" },
 ];
 
 
@@ -139,6 +155,8 @@ const LIBS = {
   pdfWorker: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js",
   docx: "https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js",
 };
+const ICONE_ENVOI = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+const ICONE_STOP = '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" class="fill"/></svg>';
 const PLACEHOLDER_URL = "https://VOTRE-PSEUDO.github.io/assistant-ia-word";
 
 /* ---------------------------------------------------------------------
@@ -200,6 +218,13 @@ function start(inWord) {
     b.title = a.consigne;
     b.addEventListener("click", () => selectAction(selectedAction === a ? null : a));
     a.button = b;
+    if (a.groupe !== "style" && a.famille && !els.actions.querySelector('[data-famille="' + a.famille + '"]')) {
+      const h = document.createElement("div");
+      h.className = "group-label";
+      h.dataset.famille = a.famille;
+      h.textContent = a.famille;
+      els.actions.appendChild(h);
+    }
     (a.groupe === "style" ? els.styles : els.actions).appendChild(b);
   });
   renderOptions();
@@ -227,7 +252,7 @@ function start(inWord) {
   $("import-file").addEventListener("change", importSettings);
   $("btn-copy-source").addEventListener("click", async () => {
     const t = await safeGetSource();
-    if (t) { await copyText(t); toast("Texte de départ copié ✓"); } else toast("Aucun texte à copier.");
+    if (t) { await copyText(t); toast("Texte de départ copié"); } else toast("Aucun texte à copier.");
   });
   els.follow.addEventListener("change", async () => {
     frozenSource = null;
@@ -238,7 +263,7 @@ function start(inWord) {
   $("btn-paste-source").addEventListener("click", pasteSource);
   $("btn-export-prompt").addEventListener("click", openExportPrompt);
   els.exportSource.addEventListener("change", buildExportPrompt);
-  $("btn-export-copy").addEventListener("click", async () => { await copyText(els.exportText.value); toast("Prompt copié ✓"); });
+  $("btn-export-copy").addEventListener("click", async () => { await copyText(els.exportText.value); toast("Prompt copié"); });
   $("btn-export-dl").addEventListener("click", () => downloadText(els.exportText.value, "prompt-assistant-ia.txt"));
   $("btn-export-close").addEventListener("click", openSettings);
   $("tab-redac").addEventListener("click", () => switchTab("redac"));
@@ -345,7 +370,7 @@ async function pasteSource() {
   }
   if (txt) {
     els.manual.value = txt;
-    toast("Texte collé ✓");
+    toast("Texte collé");
   } else {
     els.manual.focus();
     toast("Collez votre texte avec Ctrl + V");
@@ -374,7 +399,7 @@ async function refreshPreview() {
     els.preview.textContent = els.wholeDoc.checked ? "Tout le document" : text.slice(0, 280) + (text.length > 280 ? "…" : "");
     const c = document.createElement("span");
     c.className = "count";
-    const fige = !els.wholeDoc.checked && !els.follow.checked ? " · 🔒 figé" : "";
+    const fige = !els.wholeDoc.checked && !els.follow.checked ? " · figé" : "";
     c.textContent = countWords(text).toLocaleString("fr-FR") + " mots · " + text.length.toLocaleString("fr-FR") + " caractères" + fige;
     els.preview.appendChild(c);
   } catch (e) {
@@ -433,7 +458,7 @@ function selectAction(action) {
   selectedAction = action;
   ACTIONS.forEach((a) => a.button.classList.toggle("selected", a === action));
   els.selPill.hidden = !action;
-  els.selPill.textContent = action ? "Action : " + action.label + "  ✕" : "";
+  els.selPill.textContent = action ? action.label + "  ×" : "";
   els.send.classList.toggle("ready", !!action);
 }
 
@@ -452,7 +477,7 @@ async function runAction(action, extra) {
   if (avecOptions) consigne += optionsConsigne();
   const ref = action.mode === "correction" ? null : docsContext(source + " " + (extra || ""));
   const resume = avecOptions ? optionsResume() : "";
-  const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "") + (ref ? "\n📄 " + ref.label : "");
+  const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "") + (ref ? "\nDocuments : " + ref.label : "");
   await ask((ref ? ref.text : "") + buildMessage(consigne, source), label, source.length, action.mode, source, action.label);
   return true;
 }
@@ -467,7 +492,7 @@ async function sendPrompt(question) {
   const consigne = question + optionsConsigne();
   const ref = docsContext(question + " " + (attach ? source : ""));
   const content = (ref ? ref.text : "") + (attach ? buildMessage(consigne, source) : consigne);
-  await ask(content, question + (ref ? "\n📄 " + ref.label : ""), attach ? source.length : 0, "texte", attach ? source : lastSentSource, "Question");
+  await ask(content, question + (ref ? "\nDocuments : " + ref.label : ""), attach ? source.length : 0, "texte", attach ? source : lastSentSource, "Question");
 }
 
 function buildMessage(consigne, source) {
@@ -552,6 +577,13 @@ async function ask(content, displayLabel, attachedChars, mode, source, historyLa
 }
 
 function showAnswer(bubble, answer, mode, source) {
+  if (mode === "coherence" && /^aucune incoh[eé]rence/i.test(answer.trim())) {
+    bubble.root.classList.add("ok");
+    bubble.body.textContent = "Texte cohérent — aucune incohérence trouvée.";
+    updateNav();
+    return;
+  }
+  if (mode === "coherence") mode = "explication";
   if (mode === "correction" && source) {
     showCorrection(bubble, source, answer);
   } else {
@@ -559,7 +591,7 @@ function showAnswer(bubble, answer, mode, source) {
     addTools(bubble, answer, mode);
   }
   checkProtectedTerms(bubble, source, answer);
-  if (source && !/^(phrase|texte) correct/i.test(answer)) {
+  if (source && !/^(phrase|texte) correct/i.test(answer) && mode !== "explication") {
     const wc = document.createElement("div");
     wc.className = "wc";
     wc.textContent = "Mots : " + countWords(source) + " → " + countWords(answer);
@@ -579,7 +611,7 @@ function checkProtectedTerms(bubble, source, answer) {
   if (!missing.length) return;
   const w = document.createElement("div");
   w.className = "warn";
-  w.textContent = "⚠ Terme protégé modifié ou absent : " + missing.join(", ") + ". Vérifiez avant d'insérer.";
+  w.textContent = "Attention : terme protégé modifié ou absent — " + missing.join(", ") + ". Vérifiez avant d'insérer.";
   bubble.root.insertBefore(w, bubble.body.nextSibling);
 }
 
@@ -725,7 +757,7 @@ async function callLMStudio(messages, onText, signal, temperature, system) {
     }
     if (/model/i.test(detail) || res.status === 404) {
       autoModelCache = {};
-      throw new Error("Modèle introuvable dans LM Studio. Dans ⚙, cliquez « Tester la connexion » puis choisissez un modèle de la liste.\n(" + detail + ")");
+      throw new Error("Modèle introuvable dans LM Studio. Dans les Paramètres, cliquez « Tester la connexion » puis choisissez un modèle de la liste.\n(" + detail + ")");
     }
     throw new Error("LM Studio a renvoyé une erreur " + res.status + (detail ? " : " + detail : "."));
   }
@@ -754,11 +786,11 @@ async function testLMStudio() {
     autoModelCache = {};
     box.className = "test-result ok";
     box.textContent = models.length
-      ? "✓ Connecté à LM Studio. " + models.length + " modèle(s) trouvé(s). Cliquez sur Enregistrer."
-      : "✓ Serveur joint, mais aucun modèle n'est disponible. Chargez un modèle dans LM Studio.";
+      ? "Connecté à LM Studio. " + models.length + " modèle(s) trouvé(s). Cliquez sur Enregistrer."
+      : "Serveur joint, mais aucun modèle n'est disponible. Chargez un modèle dans LM Studio.";
   } catch (e) {
     box.className = "test-result ko";
-    box.textContent = "✗ " + e.message;
+    box.textContent = e.message;
   }
 }
 
@@ -795,9 +827,9 @@ async function callClaude(messages, onText, signal, temperature, system) { // (l
     try { detail = (await res.json()).error?.message || ""; } catch (_) {}
     const messagesErreur = {
       400: "Requête refusée : " + detail,
-      401: "Clé API invalide. Vérifiez-la dans les paramètres (⚙).",
+      401: "Clé API invalide. Vérifiez-la dans les Paramètres.",
       403: "Accès refusé : " + detail,
-      404: "Modèle introuvable. Vérifiez le nom du modèle dans les paramètres (⚙).",
+      404: "Modèle introuvable. Vérifiez le nom du modèle dans les Paramètres.",
       429: "Trop de demandes ou crédit épuisé. Patientez un instant ou vérifiez votre crédit sur console.anthropic.com.",
       529: "Le service est surchargé. Réessayez dans quelques secondes.",
     };
@@ -850,7 +882,7 @@ function addUserBubble(label, attachedChars) {
   if (attachedChars) {
     const s = document.createElement("span");
     s.className = "attach";
-    s.textContent = "📎 " + attachedChars.toLocaleString("fr-FR") + " caractères joints";
+    s.textContent = attachedChars.toLocaleString("fr-FR") + " caractères joints";
     d.appendChild(s);
   }
   els.chat.appendChild(d);
@@ -888,32 +920,32 @@ function addTools(bubble, text, mode) {
   };
   if (IN_WORD) {
     if (mode === "chat") {
-      add("Insérer dans Word", async () => { await wordInsertAfter(text); toast("Texte inséré ✓"); }, true);
-      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté ✓"); });
+      add("Insérer dans Word", async () => { await wordInsertAfter(text); toast("Texte inséré"); }, true);
+      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); });
     } else if (mode === "explication") {
-      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté ✓"); }, true);
-      add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré ✓"); });
+      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); }, true);
+      add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
     } else {
-      add("Remplacer la sélection", async () => { await wordReplace(text); toast("Sélection remplacée ✓"); }, true);
-      add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré ✓"); });
-      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté ✓"); });
+      add("Remplacer la sélection", async () => { await wordReplace(text); toast("Sélection remplacée"); }, true);
+      add("Insérer après", async () => { await wordInsertAfter(text); toast("Texte inséré"); });
+      add("En commentaire", async () => { await wordComment(text); toast("Commentaire ajouté"); });
     }
   }
-  add("Copier", async () => { await copyText(text); toast("Copié ✓"); }, !IN_WORD);
+  add("Copier", async () => { await copyText(text); toast("Copié"); }, !IN_WORD);
   bubble.root.appendChild(bar);
 }
 
 function showError(message) {
   const d = document.createElement("div");
   d.className = "msg error";
-  d.textContent = "⚠ " + message;
+  d.textContent = message;
   els.chat.appendChild(d);
   scrollToBottom();
 }
 
 function setBusy(busy) {
   [els.send, els.dsend].forEach((b) => {
-    b.textContent = busy ? "■" : "➤";
+    b.innerHTML = busy ? ICONE_STOP : ICONE_ENVOI;
     b.title = busy ? "Arrêter" : "Envoyer";
     b.classList.toggle("stop", busy);
   });
@@ -991,7 +1023,7 @@ function saveSettings() {
   autoModelCache = {};
   updateBadge();
   closeSettings();
-  toast("Paramètres enregistrés ✓");
+  toast("Paramètres enregistrés");
 }
 
 /* ---------------------------------------------------------------------
@@ -1013,7 +1045,7 @@ async function downloadManifest() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    toast("manifest.xml téléchargé ✓");
+    toast("manifest.xml téléchargé");
   } catch (e) {
     showError("Téléchargement du manifeste impossible : " + e.message);
   }
@@ -1030,11 +1062,16 @@ function loadOptions() {
 // Retire les tons contraires (garde le premier coché)
 function sanitizeOptions(o) {
   const kept = [];
+  const rn = (x) => RENOMMAGES[x] || x;
+  o = Object.assign({}, o, {
+    tons: (o.tons || []).map(rn), domaines: (o.domaines || []).map(rn), destinataire: rn(o.destinataire || ""),
+  });
   (o.tons || []).forEach((t) => {
     if (TONS.some((x) => x.label === t) && !kept.some((k) => tonsIncompatibles(k).has(t))) kept.push(t);
   });
   const domaines = (o.domaines || []).filter((x) => DOMAINES.some((d) => d.label === x));
-  return { tons: kept, domaines, forme: o.forme || "", longueur: o.longueur || "", destinataire: o.destinataire || "" };
+  const dest = DESTINATAIRES.some((d) => d.label === o.destinataire) ? o.destinataire : "";
+  return { tons: kept, domaines, forme: o.forme || "", longueur: o.longueur || "", destinataire: dest };
 }
 function saveOptions() {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
@@ -1043,7 +1080,7 @@ function saveOptions() {
 function chip(label, on, title, onClick, disabled) {
   const b = document.createElement("button");
   b.className = "chip" + (on ? " on" : "");
-  b.textContent = (on ? "✓ " : "") + label;
+  b.textContent = label;
   b.title = title;
   b.disabled = !!disabled;
   b.setAttribute("aria-pressed", on);
@@ -1054,7 +1091,15 @@ function chip(label, on, title, onClick, disabled) {
 function renderOptions() {
   // Tons : plusieurs choix
   els.tons.innerHTML = "";
+  let groupeCourant = "";
   TONS.forEach((t) => {
+    if (t.groupe !== groupeCourant) {
+      groupeCourant = t.groupe;
+      const h = document.createElement("div");
+      h.className = "group-label";
+      h.textContent = t.groupe;
+      els.tons.appendChild(h);
+    }
     const on = options.tons.includes(t.label);
     const bloquant = options.tons.find((x) => tonsIncompatibles(x).has(t.label));
     const titre = bloquant ? "Incompatible avec « " + bloquant + " »" : t.consigne;
@@ -1097,7 +1142,7 @@ function loadHistory() {
 }
 
 function saveToHistory(label, answer, mode, source) {
-  if (/^(phrase|texte) correct/i.test(answer)) return;
+  if (/^(phrase|texte) correct|^aucune incoh/i.test(answer)) return;
   const list = loadHistory();
   list.unshift({ date: new Date().toISOString(), label, answer, mode, source: (source || "").slice(0, 6000) });
   try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX))); } catch (_) {}
@@ -1146,7 +1191,7 @@ function updateNav() {
   $("nav-prev").disabled = !!controller || browseIndex >= list.length - 1;
   $("nav-next").disabled = !!controller || browseIndex < 0;
   els.navPos.textContent = browseIndex < 0
-    ? "Résultats (" + list.length + ") — ← pour parcourir"
+    ? "Historique · " + list.length + " résultat" + (list.length > 1 ? "s" : "")
     : browseIndex === 0
       ? "Résultat actuel · " + list.length + " / " + list.length
       : "Ancien résultat · " + (list.length - browseIndex) + " / " + list.length;
@@ -1198,7 +1243,7 @@ function showBrowse(h, isCurrent) {
   const cp = document.createElement("button");
   cp.className = "tool";
   cp.textContent = "Copier";
-  cp.addEventListener("click", async () => { await copyText(h.source || ""); toast("Texte de départ copié ✓"); });
+  cp.addEventListener("click", async () => { await copyText(h.source || ""); toast("Texte de départ copié"); });
   sbar.appendChild(cp);
   src.append(st, sb, sbar);
 
@@ -1239,7 +1284,7 @@ function saveFavorite() {
   storeFavorites(list);
   els.favForm.hidden = true;
   renderFavorites();
-  toast("Favori « " + name + " » enregistré ✓");
+  toast("Favori « " + name + " » enregistré");
 }
 
 function applyFavorite(f) {
@@ -1247,7 +1292,7 @@ function applyFavorite(f) {
   saveOptions();
   renderOptions();
   selectAction(ACTIONS.find((a) => a.label === f.action) || null);
-  toast("Favori « " + f.name + " » activé — appuyez sur ➤");
+  toast("Favori « " + f.name + " » activé — il ne reste qu'à lancer");
 }
 
 function renderFavorites() {
@@ -1262,10 +1307,10 @@ function renderFavorites() {
     wrap.className = "fav";
     const fo = sanitizeOptions(f.options || {});
     const details = [f.action].concat(fo.tons, fo.domaines, [(f.options || {}).forme, (f.options || {}).longueur, (f.options || {}).destinataire]).filter(Boolean).join(", ");
-    const b = chip("★ " + f.name, false, details || "Réglages vides", () => applyFavorite(f), !!controller);
+    const b = chip(f.name, false, details || "Réglages vides", () => applyFavorite(f), !!controller);
     const del = document.createElement("button");
     del.className = "fav-del";
-    del.textContent = "✕";
+    del.textContent = "×";
     del.title = "Supprimer ce favori";
     del.addEventListener("click", () => { storeFavorites(loadFavorites().filter((x) => x.name !== f.name)); renderFavorites(); });
     wrap.append(b, del);
@@ -1291,7 +1336,7 @@ async function exportSettings() {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (_) {}
   await copyText(json);
-  toast("Réglages exportés (fichier téléchargé et copié) ✓");
+  toast("Réglages exportés (fichier téléchargé et copié)");
 }
 
 async function importSettings(e) {
@@ -1307,7 +1352,7 @@ async function importSettings(e) {
     if (data.options) { options = sanitizeOptions(data.options); saveOptions(); }
     if (Array.isArray(data.favoris)) storeFavorites(data.favoris);
     renderOptions(); renderFavorites(); updateBadge(); openSettings();
-    toast("Réglages importés ✓");
+    toast("Réglages importés");
   } catch (err) {
     toast("Import impossible : " + err.message);
   }
@@ -1330,7 +1375,7 @@ function updateDocsBadge() {
   els.docsCount.hidden = !docs.length;
   els.docsCount.textContent = actifs;
   els.useDocsWrap.hidden = !actifs;
-  els.useDocsWrap.lastChild.textContent = " 📄 Documents (" + actifs + ")";
+  els.useDocsWrap.lastChild.textContent = " Documents (" + actifs + ")";
   if (els.chatDocs && currentTab === "chat") renderChatDocs();
 }
 
@@ -1404,9 +1449,9 @@ async function addDocuments(files) {
       docs = docs.filter((d) => d.name !== file.name);
       docs.push({ name: file.name, chunks, chars: chunks.reduce((s, c) => s + c.text.length, 0), use: true });
       saveDocs();
-      els.docsStatus.textContent = "✓ « " + file.name + " » ajouté.";
+      els.docsStatus.textContent = "« " + file.name + " » ajouté.";
     } catch (e) {
-      els.docsStatus.textContent = "✗ « " + file.name + " » : " + e.message + ".";
+      els.docsStatus.textContent = "Échec — « " + file.name + " » : " + e.message + ".";
     }
     renderDocs();
   }
@@ -1436,7 +1481,7 @@ function renderDocs() {
     info.append(n, m);
     const del = document.createElement("button");
     del.className = "fav-del";
-    del.textContent = "✕";
+    del.textContent = "×";
     del.title = "Retirer";
     del.addEventListener("click", () => { docs = docs.filter((x) => x !== d); saveDocs(); renderDocs(); });
     item.append(cb, info, del);
@@ -1568,7 +1613,7 @@ function renderChatDocs() {
     cb.addEventListener("change", () => { d.use = cb.checked; saveDocs(); });
     const name = document.createElement("span");
     name.className = "doc-name";
-    name.textContent = "📄 " + d.name;
+    name.textContent = d.name;
     const size = document.createElement("span");
     size.className = "muted";
     size.textContent = Math.round(d.chars / 1000) + " k car.";
@@ -1608,7 +1653,7 @@ async function summarizeChat(call) {
     (t) => (sum += t), controller.signal, 0.2, "Tu résumes des discussions de façon factuelle et concise, en français, sans Markdown.");
   chatSummary = cleanText(withoutThinking(sum));
   chatHistory = chatHistory.slice(-CHAT_KEEP_MESSAGES);
-  note.body.textContent = "ℹ Les anciens échanges ont été résumés pour que les réponses restent rapides.";
+  note.body.textContent = "Les anciens échanges ont été résumés pour que les réponses restent rapides.";
 }
 
 async function chatSend() {
@@ -1644,7 +1689,7 @@ async function chatSend() {
     if (chatPool.length) {
       const src = document.createElement("div");
       src.className = "wc";
-      src.textContent = "📄 " + new Set(chatPool.map((c) => c.doc)).size + " document(s) · " + chatPool.length + " extrait(s) consultés";
+      src.textContent = "Sources : " + new Set(chatPool.map((c) => c.doc)).size + " document(s) · " + chatPool.length + " extrait(s) consultés";
       bubble.root.appendChild(src);
     }
     addTools(bubble, answer, "chat");
@@ -1657,7 +1702,7 @@ async function chatSend() {
     } else {
       if (bubble) bubble.root.remove();
       if (chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") chatHistory.pop();
-      chatBubble("error", "⚠ " + e.message);
+      chatBubble("error", e.message);
     }
   } finally {
     if (bubble) bubble.body.classList.remove("streaming");
@@ -1672,7 +1717,7 @@ async function chatSend() {
 function openExportPrompt() {
   els.exportSource.innerHTML = "";
   els.exportSource.add(new Option("Réglages actuels" + (selectedAction ? " (" + selectedAction.label + ")" : ""), ""));
-  loadFavorites().forEach((f) => els.exportSource.add(new Option("★ " + f.name, f.name)));
+  loadFavorites().forEach((f) => els.exportSource.add(new Option("Favori : " + f.name, f.name)));
   buildExportPrompt();
   showPanel(els.promptPanel);
 }
@@ -1708,7 +1753,7 @@ function downloadText(text, filename) {
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    toast("Fichier téléchargé ✓");
+    toast("Fichier téléchargé");
   } catch (_) { toast("Téléchargement impossible : utilisez « Copier »."); }
 }
 
@@ -1719,7 +1764,7 @@ function showCorrection(bubble, source, answer) {
   const norm = (t) => t.replace(/\s+/g, " ").trim();
   if (/^(phrase|texte) correct(e)?\s*\.?$/i.test(answer.trim()) || norm(answer) === norm(source)) {
     bubble.root.classList.add("ok");
-    bubble.body.textContent = "✓ Phrase correcte — aucune faute trouvée.";
+    bubble.body.textContent = "Phrase correcte — aucune faute trouvée.";
     return;
   }
   const parts = diffWords(source, answer);
