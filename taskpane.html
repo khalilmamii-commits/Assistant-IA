@@ -82,12 +82,10 @@
     </label>
     <p class="hint">Noms de lieux, références, codes… L'IA doit les recopier tels quels. Un avertissement s'affiche si l'un d'eux disparaît.</p>
 
-    <label>Affichage</label>
-    <div class="read-row">
-      <label class="switch"><input type="checkbox" id="set-easy"><span class="slider"></span> Lecture facile</label>
-    </div>
+    <label>Police et taille (s'appliquent tout de suite)</label>
     <div class="read-row">
       <select id="set-font" title="Police du panneau">
+        <option value="">Police normale</option>
         <option value="OpenDyslexic">OpenDyslexic</option>
         <option value="Lexend">Lexend</option>
         <option value="Atkinson Hyperlegible">Atkinson Hyperlegible</option>
@@ -176,15 +174,24 @@
         <summary><span class="block-title">Réglages</span> <span id="options-summary" class="muted"></span>
           <button id="btn-options-clear" class="link-btn" hidden>Effacer</button></summary>
         <div class="grp"><div class="grp-title">Ton</div><div id="tons" class="chips"></div></div>
-        <div class="grp"><div class="grp-title">Domaine</div><div id="opt-domaines" class="chips"></div></div>
-        <div class="grp"><div class="grp-title">Style</div><div id="styles" class="chips"></div></div>
         <div class="grp"><div class="grp-title">Forme</div><div id="opt-forme" class="chips"></div></div>
-        <div class="grp"><div class="grp-title">Longueur</div><div id="opt-longueur" class="chips"></div></div>
+        <div class="grp">
+          <div class="grp-title">Longueur <span id="len-value" class="len-value">libre</span>
+            <button id="btn-len-clear" class="link-btn len-clear" hidden>libre</button></div>
+          <input type="range" id="len-range" min="0" max="4" step="1" value="2" list="len-ticks">
+          <datalist id="len-ticks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option></datalist>
+          <div class="len-labels"><span>×½</span><span>×¾</span><span>identique</span><span>×1,5</span><span>×2</span></div>
+        </div>
         <div class="grp"><div class="grp-title">Mise en valeur</div><div id="opt-valeur" class="chips"></div></div>
         <div class="grp"><div class="grp-title">Destinataire</div><div id="opt-destinataire" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Style</div><div id="styles" class="chips"></div></div>
+        <div class="grp"><div class="grp-title">Domaine</div><div id="opt-domaines" class="chips"></div></div>
       </details>
     </div>
 
+    <div id="splitter" class="splitter" title="Glisser pour agrandir les choix ou les textes · double-clic : au milieu"><span class="grip"></span></div>
+
+    <div class="texts-zone">
     <section class="card source">
       <div class="source-head">
         <span class="block-title">Texte ciblé</span>
@@ -206,6 +213,7 @@
     </section>
 
     <section id="chat" class="chat result-zone"></section>
+    </div>
   </main>
 
   <!-- DOCUMENTS : dépôt des fichiers et questions, au même endroit -->
@@ -248,7 +256,6 @@
     </div>
     <div class="composer-opts">
       <label class="toggle" id="use-docs-wrap" hidden title="Joindre les passages utiles des documents"><input type="checkbox" id="use-docs" checked> Documents</label>
-      <label class="toggle" title="Deux versions différentes (deux fois plus long)"><input type="checkbox" id="two-versions"> 2 versions</label>
       <label class="toggle" id="keep-format-wrap" title="Garde la police, la taille et la couleur du passage d'origine"><input type="checkbox" id="keep-format" checked> Garder la mise en forme</label>
     </div>
   </footer>

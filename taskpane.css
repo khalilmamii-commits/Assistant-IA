@@ -507,3 +507,40 @@ body.easy .msg, body.easy .preview, body.easy textarea { line-height: 1.65; word
 .tool { padding: 2px 5px; font-size: 10.5px; letter-spacing: -.01em; }
 input[type="checkbox"] { accent-color: var(--accent); }
 .composer-opts { gap: 4px 12px; }
+
+/* =====================================================================
+   v10 — barre à glisser, longueur en curseur, police directe, largeur adaptable
+   ===================================================================== */
+/* Les trois blocs : choix | barre | textes, puis la consigne en bas */
+.top-zone { flex: none; max-height: none; min-height: 44px; }
+.splitter { flex: none; height: 12px; margin: 2px 0; cursor: row-resize; display: flex; align-items: center; justify-content: center; touch-action: none; border-radius: 4px; }
+.splitter .grip { width: 42px; height: 4px; border-radius: 2px; background: #c9ced6; }
+.splitter:hover .grip, .splitter.drag .grip { background: var(--accent); width: 60px; }
+.texts-zone { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.texts-zone .source { margin-top: 0; }
+
+/* Curseur de longueur à 5 crans */
+#len-range { width: 100%; margin: 2px 0 0; accent-color: var(--accent); }
+#len-range.inactive { opacity: .45; }
+.len-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: -2px; }
+.len-value { text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--text); margin-left: 6px; }
+.len-clear { font-size: 10px; margin-left: 6px; text-transform: none; letter-spacing: 0; }
+
+/* Actions : les colonnes s'adaptent à la largeur du panneau */
+.actions.grid3 { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
+.actions.grid3 .action { min-width: 0; }
+
+/* Police choisie : appliquée à tout le panneau */
+body.easy { zoom: 1; height: auto; letter-spacing: normal; }
+body.custom-font, body.custom-font button, body.custom-font input, body.custom-font textarea, body.custom-font select {
+  font-family: var(--easy-font), "Segoe UI", system-ui, sans-serif;
+}
+body.dys .msg, body.dys .preview, body.dys textarea { line-height: 1.65; word-spacing: .06em; }
+body.dys { letter-spacing: .01em; }
+body.zoomed { zoom: var(--zoom); height: calc(100vh / var(--zoom)); }
+
+/* Bouton « Cibler » discret */
+.tool[title^="Mettre ce résultat"] { border-style: dashed; }
+.msg-tools { gap: 2px; }
+.tool { padding: 2px 4px; font-size: 10px; letter-spacing: -.015em; }
+@media (min-width: 380px) { .tool { padding: 2px 6px; font-size: 10.5px; letter-spacing: 0; } .msg-tools { gap: 3px; } }

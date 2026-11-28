@@ -61,6 +61,7 @@ const TONS = [
   { groupe: "Registre", label: "Familier",     consigne: "ton oral et détendu" },
   // Rigueur
   { groupe: "Rigueur", label: "Neutre",        consigne: "aucun jugement ni émotion" },
+  { groupe: "Rigueur", label: "Naturel",      consigne: "écris comme une vraie personne, de façon que personne ne puisse deviner qu'une IA a écrit le texte : phrases de longueurs variées, enchaînements naturels, vocabulaire courant et précis, aucune formule toute faite (« il est important de noter », « en conclusion », « par ailleurs » en série), pas de listes systématiques ni de symétries artificielles" },
   { groupe: "Rigueur", label: "Informatif",    consigne: "factuel, centré sur l'information utile" },
   { groupe: "Rigueur", label: "Précis",        consigne: "vocabulaire exact, chiffres et références conservés, aucune formulation vague" },
   { groupe: "Rigueur", label: "Technique",     consigne: "vocabulaire du métier, explication détaillée des solutions et des choix techniques" },
@@ -118,6 +119,8 @@ const FORMES = [
   { label: "Texte rédigé", consigne: "rédige en paragraphes continus, sans liste à puces" },
   { label: "Mixte",        consigne: "combine une courte introduction rédigée, une liste à tirets pour les points clés, puis une phrase de conclusion" },
 ];
+const LONGUEURS_X = [0.5, 0.75, 1, 1.5, 2];   // crans du curseur de longueur
+const LONGUEURS_TXT = { 0.5: "×½", 0.75: "×¾", 1: "identique", 1.5: "×1,5", 2: "×2" };
 const LONGUEURS = [
   { label: "Plus court", consigne: "nettement plus court que le texte d'origine" },
   { label: "Identique",  consigne: "longueur proche de celle du texte d'origine" },
@@ -209,11 +212,13 @@ const els = {
   preview: $("selection-preview"), manual: $("manual-text"), wholeDoc: $("whole-doc"),
   prompt: $("prompt"), send: $("btn-send"), banner: $("browser-banner"), toast: $("toast"),
   badge: $("engine-badge"), styles: $("styles"), tons: $("tons"),
-  forme: $("opt-forme"), longueur: $("opt-longueur"), destinataire: $("opt-destinataire"),
+  forme: $("opt-forme"), destinataire: $("opt-destinataire"),
+  lenRange: $("len-range"), lenValue: $("len-value"), lenClear: $("btn-len-clear"),
+  splitter: $("splitter"), topZone: document.querySelector(".top-zone"),
   optionsSummary: $("options-summary"), selPill: $("sel-pill"), twoVersions: $("two-versions"),
   rules: $("set-rules"), protectedTerms: $("set-protected"),
   historyPanel: $("history-panel"), actionSummary: $("action-summary"), resetBar: $("reset-confirm"),
-  easy: $("set-easy"), font: $("set-font"), size: $("set-size"),
+  font: $("set-font"), size: $("set-size"),
   docsPanel: $("docs-panel"), docsList: $("docs-list"), docsStatus: $("docs-status"), docsInput: $("docs-input"),
   docsCount: $("docs-count"), useDocs: $("use-docs"), useDocsWrap: $("use-docs-wrap"),
   favList: $("fav-list"), favForm: $("fav-form"), favName: $("fav-name"),
@@ -251,10 +256,13 @@ function start(inWord) {
     saveOptions(); renderOptions();
   });
   $("nav-redac").addEventListener("click", () => switchTab("redac"));
+  els.lenRange.addEventListener("input", () => { options.longueur = LONGUEURS_X[+els.lenRange.value]; saveOptions(); renderOptions(); });
+  els.lenClear.addEventListener("click", (e) => { e.preventDefault(); options.longueur = ""; saveOptions(); renderOptions(); });
+  initSplitter();
   $("btn-new").addEventListener("click", () => (els.resetBar.hidden = false));
   $("btn-reset-no").addEventListener("click", () => (els.resetBar.hidden = true));
   $("btn-reset-yes").addEventListener("click", resetAll);
-  [els.easy, els.font, els.size].forEach((x) => x.addEventListener("change", saveAffichage));
+  [els.font, els.size].forEach((x) => x.addEventListener("change", saveAffichage));
   els.selPill.addEventListener("click", () => selectAction(null));
   $("btn-history").addEventListener("click", openHistory);
   $("btn-history-close").addEventListener("click", closePanels);
@@ -404,22 +412,66 @@ function resetAll() {
   toast("Tout est réinitialisé");
 }
 
-/* Lecture facile : police et taille de tout le panneau */
+/* Police et taille de tout le panneau : s'appliquent tout de suite et sont gardées */
 function loadAffichage() {
-  try { return Object.assign({ easy: false, font: "OpenDyslexic", size: "1" }, JSON.parse(localStorage.getItem(AFFICHAGE_KEY) || "{}")); }
-  catch (_) { return { easy: false, font: "OpenDyslexic", size: "1" }; }
+  try { return Object.assign({ font: "", size: "1" }, JSON.parse(localStorage.getItem(AFFICHAGE_KEY) || "{}")); }
+  catch (_) { return { font: "", size: "1" }; }
 }
 function applyAffichage() {
   const a = loadAffichage();
-  els.easy.checked = a.easy; els.font.value = a.font; els.size.value = a.size;
-  document.body.classList.toggle("easy", a.easy);
-  document.documentElement.style.setProperty("--easy-font", '"' + a.font + '"');
-  document.documentElement.style.setProperty("--zoom", a.easy ? a.size : "1");
+  if (a.easy === false && a.font === "OpenDyslexic") a.font = "";   // ancien réglage inactif
+  els.font.value = a.font; els.size.value = a.size;
+  document.body.classList.toggle("custom-font", !!a.font);
+  document.body.classList.toggle("dys", a.font === "OpenDyslexic" || a.font === "Lexend" || a.font === "Atkinson Hyperlegible");
+  document.documentElement.style.setProperty("--easy-font", a.font ? '"' + a.font + '"' : "inherit");
+  document.documentElement.style.setProperty("--zoom", a.size || "1");
+  document.body.classList.toggle("zoomed", a.size !== "1");
 }
 function saveAffichage() {
-  const a = { easy: els.easy.checked, font: els.font.value, size: els.size.value };
+  const a = { font: els.font.value, size: els.size.value };
   try { localStorage.setItem(AFFICHAGE_KEY, JSON.stringify(a)); } catch (_) {}
   applyAffichage();
+}
+
+/* Barre à glisser entre les choix et les textes (butées : chaque bloc reste visible) */
+const SPLIT_KEY = "assistant-ia-word.separation";
+function initSplitter() {
+  const sp = els.splitter, top = els.topZone, main = els.main;
+  const MIN_TOP = 44, MIN_TEXTS = 110;
+  const limits = () => {
+    const avail = main.clientHeight - sp.offsetHeight - (els.banner.hidden ? 0 : els.banner.offsetHeight) - 12;
+    return { min: MIN_TOP, max: Math.max(MIN_TOP, avail - MIN_TEXTS), avail };
+  };
+  const setH = (h) => {
+    const l = limits();
+    h = Math.min(l.max, Math.max(l.min, h));
+    top.style.height = h + "px";
+    top.style.maxHeight = "none";
+    return h;
+  };
+  let ratio = null;
+  try { ratio = parseFloat(localStorage.getItem(SPLIT_KEY)); } catch (_) {}
+  const restore = () => { const l = limits(); if (l.avail > 0) setH(ratio ? ratio * l.avail : Math.min(top.scrollHeight, l.avail * 0.5)); };
+  requestAnimationFrame(restore);
+  window.addEventListener("resize", restore);
+  let startY = 0, startH = 0, dragging = false;
+  sp.addEventListener("pointerdown", (e) => {
+    dragging = true; startY = e.clientY; startH = top.offsetHeight;
+    sp.setPointerCapture(e.pointerId); sp.classList.add("drag"); e.preventDefault();
+  });
+  sp.addEventListener("pointermove", (e) => { if (dragging) setH(startH + e.clientY - startY); });
+  const stop = () => {
+    if (!dragging) return;
+    dragging = false; sp.classList.remove("drag");
+    ratio = top.offsetHeight / limits().avail;
+    try { localStorage.setItem(SPLIT_KEY, ratio); } catch (_) {}
+  };
+  sp.addEventListener("pointerup", stop);
+  sp.addEventListener("pointercancel", stop);
+  sp.addEventListener("dblclick", () => {
+    setH(limits().avail * 0.5); ratio = 0.5;
+    try { localStorage.setItem(SPLIT_KEY, ratio); } catch (_) {}
+  });
 }
 
 if (typeof Office !== "undefined" && Office.onReady) {
@@ -502,6 +554,20 @@ function updateSourceCount() {
   if (els.manual.hidden) return;
   const t = els.manual.value.trim();
   els.sourceCount.textContent = t ? countWords(t).toLocaleString("fr-FR") + " mots · " + t.length.toLocaleString("fr-FR") + " caractères" : "";
+}
+
+// Bouton « Cibler » : le résultat devient le texte ciblé
+function setTarget(text) {
+  if (IN_WORD) {
+    pastedSource = true;
+    els.follow.checked = false;
+    els.preview.hidden = true;
+    els.manual.hidden = false;
+  }
+  els.manual.value = text;
+  updateSourceCount();
+  newConversation();
+  toast("Résultat placé dans le texte ciblé");
 }
 
 // Sélectionne le texte affiché dans le panneau (pour le copier ou le retoucher)
@@ -681,7 +747,14 @@ async function runAction(action, extra) {
   variante = runKey === lastRunKey;
   lastRunKey = runKey;
   if (extra) consigne += "\n\nConsigne complémentaire de l'utilisateur : " + extra;
-  if (avecOptions) consigne += optionsConsigne(action.estStyle);
+  const nbMots = countWords(source);
+  let ignorerLongueur = false;
+  if (action.label === "Résumer") {
+    const f = options.longueur && options.longueur <= 1 ? options.longueur : 1;
+    consigne += " Le résumé doit faire au maximum " + cibleMots(nbMots, f / 3) + " mots (le texte en compte " + nbMots + ") : garde uniquement l'essentiel.";
+    ignorerLongueur = true;
+  }
+  if (avecOptions) consigne += optionsConsigne(action.estStyle, nbMots, ignorerLongueur);
   const ref = action.mode === "correction" ? null : docsContext(source + " " + (extra || ""));
   const resume = avecOptions ? optionsResume() : "";
   const label = action.label + (resume ? " · " + resume : "") + (extra ? "\n« " + extra + " »" : "") + (ref ? "\nDocuments : " + ref.label : "");
@@ -703,13 +776,14 @@ async function sendPrompt(consigneUtilisateur) {
   const ref = docsContext(consigneUtilisateur + " " + (source || ""));
   let content;
   if (suite) {
+    const dernier = [...history].reverse().find((m) => m.role === "assistant");
     content = "Consigne : " + consigneUtilisateur +
-      "\nApplique cette consigne au dernier texte que tu as produit et renvoie uniquement le texte modifié." + optionsConsigne();
+      "\nApplique cette consigne au dernier texte que tu as produit et renvoie uniquement le texte modifié." + optionsConsigne(false, dernier ? countWords(sansMarques(dernier.content)) : 0);
   } else {
     newConversation();
     lastSentSource = source;
     content = buildMessage("Applique cette consigne au texte ci-dessous et renvoie uniquement le texte modifié. Consigne : " +
-      consigneUtilisateur + optionsConsigne(), source);
+      consigneUtilisateur + optionsConsigne(false, countWords(source)), source);
   }
   await ask((ref ? ref.text : "") + content, "Consigne : " + consigneUtilisateur + (ref ? "\nDocuments : " + ref.label : ""),
     suite ? 0 : source.length, "texte", suite ? lastSentSource : source, "Consigne");
@@ -747,9 +821,9 @@ async function ask(content, displayLabel, attachedChars, mode, source, historyLa
     return;
   }
 
-  addUserBubble(displayLabel, attachedChars);
+  // (plus de bulle de rappel des choix au-dessus du résultat)
   history.push({ role: "user", content });
-  const versions = els.twoVersions.checked ? 2 : 1;
+  const versions = 1;
   const call = settings.provider === "claude" ? callClaude : callLMStudio;
   let firstAnswer = null;
   setBusy(true);
@@ -824,7 +898,8 @@ function showAnswer(bubble, answer, mode, source) {
   if (source && !/^(phrase|texte) correct/i.test(answer) && mode !== "explication") {
     const wc = document.createElement("div");
     wc.className = "wc";
-    wc.textContent = "Mots : " + countWords(source) + " → " + countWords(sansMarques(answer));
+    const n0 = countWords(source), n1 = countWords(sansMarques(answer));
+    wc.textContent = "Mots : " + n0 + " → " + n1 + (options.longueur && mode === "texte" ? " · cible ≈ " + cibleMots(n0, options.longueur) : "");
     bubble.root.insertBefore(wc, bubble.body.nextSibling);
   }
 }
@@ -878,7 +953,10 @@ function systemPrompt() {
 }
 
 // Consignes ajoutées à la demande selon les réglages du texte
-function optionsConsigne(styleDejaDansAction) {
+// Longueur visée en mots, d'après le curseur
+function cibleMots(nbMots, facteur) { return Math.max(8, Math.round(nbMots * facteur)); }
+
+function optionsConsigne(styleDejaDansAction, nbMots, ignorerLongueur) {
   const parts = [];
   const st = STYLES.find((x) => x.label === options.style);
   if (st && !styleDejaDansAction) parts.push("Style : " + st.consigne);
@@ -898,14 +976,21 @@ function optionsConsigne(styleDejaDansAction) {
     if (o) parts.push(titre + " : " + o.consigne + ".");
   };
   one(FORMES, options.forme, "Forme");
-  one(LONGUEURS, options.longueur, "Longueur");
+  if (options.longueur && !ignorerLongueur) {
+    const f = options.longueur;
+    const quoi = f === 1 ? "la même longueur que le texte d'origine (à 10 % près)"
+      : f < 1 ? "un texte nettement plus court, environ " + LONGUEURS_TXT[f].replace("×", "") + " de la longueur d'origine"
+      : "un texte environ " + LONGUEURS_TXT[f].replace("×", "") + " fois plus long que l'original, sans inventer de faits (écris [à compléter] si une information manque)";
+    parts.push("LONGUEUR IMPÉRATIVE : " + quoi + (nbMots ? ", soit environ " + cibleMots(nbMots, f) + " mots (le texte d'origine en compte " + nbMots + ")." : ".") +
+      " Respecte cette longueur avant tout le reste.");
+  }
   one(DESTINATAIRES, options.destinataire, "Destinataire : adapte le texte pour");
   if (options.valeur) parts.push("Mise en valeur : encadre avec ** seulement 3 à 5 mots-clés ou chiffres importants (exemple : **50 m**). N'utilise aucune autre mise en forme.");
   return parts.length ? "\n\n" + parts.join("\n\n") : "";
 }
 
 function optionsResume() {
-  return options.tons.concat(options.domaines, [options.style, options.forme, options.longueur, options.destinataire, options.valeur ? "Mise en valeur" : ""].filter(Boolean)).join(", ");
+  return options.tons.concat(options.domaines, [options.style, options.forme, options.longueur ? "Longueur " + LONGUEURS_TXT[options.longueur] : "", options.destinataire, options.valeur ? "Mise en valeur" : ""].filter(Boolean)).join(", ");
 }
 
 /* ---------------------------------------------------------------------
@@ -1174,6 +1259,7 @@ function addTools(bubble, text, mode) {
       add("Commenter", async () => { await wordComment(text); toast("Commentaire ajouté"); });
     }
   }
+  if (mode !== "chat") add("Cibler", async () => setTarget(plain)).title = "Mettre ce résultat dans le texte ciblé pour le retravailler";
   add("Copier", async () => { await copyText(plain); toast("Copié"); }, !IN_WORD);
   add("Sélect.", async () => selectTextIn(bubble.body));
   bubble.root.appendChild(bar);
@@ -1318,7 +1404,10 @@ function sanitizeOptions(o) {
   const domaines = (o.domaines || []).filter((x) => DOMAINES.some((d) => d.label === x));
   const style = STYLES.some((x) => x.label === rn(o.style || "")) ? rn(o.style || "") : "";
   const dest = DESTINATAIRES.some((d) => d.label === o.destinataire) ? o.destinataire : "";
-  return { tons: kept, domaines, style, forme: o.forme || "", longueur: o.longueur || "", destinataire: dest, valeur: !!o.valeur };
+  const anciens = { "Plus court": 0.5, "Identique": 1, "Plus long": 1.5 };
+  let longueur = anciens[o.longueur] !== undefined ? anciens[o.longueur] : Number(o.longueur);
+  if (!LONGUEURS_X.includes(longueur)) longueur = "";
+  return { tons: kept, domaines, style, forme: o.forme || "", longueur, destinataire: dest, valeur: !!o.valeur };
 }
 function saveOptions() {
   try { localStorage.setItem(OPTIONS_KEY, JSON.stringify(options)); } catch (_) {}
@@ -1357,7 +1446,7 @@ function renderOptions() {
     }, !!controller));
   });
   // Style, forme, longueur, destinataire : un seul choix
-  [["style", STYLES, els.styles], ["forme", FORMES, els.forme], ["longueur", LONGUEURS, els.longueur], ["destinataire", DESTINATAIRES, els.destinataire]]
+  [["style", STYLES, els.styles], ["forme", FORMES, els.forme], ["destinataire", DESTINATAIRES, els.destinataire]]
     .forEach(([key, list, box]) => {
       box.innerHTML = "";
       list.forEach((o) => {
@@ -1368,6 +1457,13 @@ function renderOptions() {
         }, !!controller));
       });
     });
+  // Curseur de longueur
+  const iLen = options.longueur ? LONGUEURS_X.indexOf(options.longueur) : 2;
+  els.lenRange.value = iLen;
+  els.lenRange.classList.toggle("inactive", !options.longueur);
+  els.lenRange.disabled = !!controller;
+  els.lenValue.textContent = options.longueur ? LONGUEURS_TXT[options.longueur] : "libre";
+  els.lenClear.hidden = !options.longueur;
   els.valeur.innerHTML = "";
   els.valeur.appendChild(chip("Mots-clés en gras", options.valeur, "Met en gras quelques mots-clés et chiffres importants", () => {
     options.valeur = !options.valeur;
